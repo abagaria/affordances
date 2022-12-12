@@ -1,0 +1,90 @@
+import ipdb
+import torch
+import random
+import numpy as np
+from pfrl import nn as pnn
+from pfrl import replay_buffers
+from pfrl import agents, explorers
+from pfrl.wrappers import atari_wrappers
+from pfrl.q_functions import DistributionalDuelingDQN
+from pfrl.utils import batch_states as pfrl_batch_states
+
+
+class Rainbow:
+  def __init__(self, n_actions, n_atoms, v_min, v_max, noisy_net_sigma, lr, 
+         n_steps, betasteps, replay_start_size, replay_buffer_size, gpu,
+         n_obs_channels, use_custom_batch_states=True):
+    self.n_actions = n_actions
+    n_channels = n_obs_channels
+    self.use_custom_batch_states = use_custom_batch_states
+
+    self.q_func = DistributionalDuelingDQN(n_actions, n_atoms, v_min, v_max, n_input_channels=n_channels)
+    pnn.to_factorized_noisy(self.q_func, sigma_scale=noisy_net_sigma)
+
+    explorer = explorers.Greedy()
+    opt = torch.optim.Adam(self.q_func.parameters(), lr, eps=1.5e-4)
+
+    self.rbuf = replay_buffers.PrioritizedReplayBuffer(
+      replay_buffer_size,
+      alpha=0.5, 
+      beta0=0.4,
+      betasteps=betasteps,
+      num_steps=n_steps,
+      normalize_by_max="memory"
+    )
+
+    self.agent = agents.CategoricalDoubleDQN(
+      self.q_func,
+      opt,
+      self.rbuf,
+      gpu=gpu,
+      gamma=0.99,
+      explorer=explorer,
+      minibatch_size=32,
+      replay_start_size=replay_start_size,
+      target_update_interval=32_000,
+      update_interval=4,
+      batch_accumulator="mean",
+      phi=self.phi,
+      batch_states=self.batch_states if use_custom_batch_states else pfrl_batch_states
+    )
+
+    self.T = 0
+    self.device = torch.device(f"cuda:{gpu}" if gpu > -1 else "cpu")
+
+  @staticmethod
+  def batch_states(states, device, phi):
+    assert isinstance(states, list), type(states)
+    features = np.array([phi(s) for s in states])
+    return torch.as_tensor(features).to(device)
+
+  @staticmethod
+  def phi(x):
+    """ Observation pre-processing for convolutional layers. """
+    return np.asarray(x, dtype=np.float32) / 255.
+
+  def act(self, state):
+    """ Action selection method at the current state. """
+    return self.agent.act(state)
+
+  def step(self, state, action, reward, next_state, done, reset):
+    """ Learning update based on a given transition from the environment. """
+    self._overwrite_pfrl_state(state, action)
+    self.agent.observe(next_state, reward, done, reset)
+
+  def _overwrite_pfrl_state(self, state, action):
+    """ Hack the pfrl state so that we can call act() consecutively during an episode before calling step(). """
+    self.agent.batch_last_obs = [state]
+    self.agent.batch_last_action = [action]
+
+  @torch.no_grad()
+  def value_function(self, states):
+    batch_states = self.agent.batch_states(states, self.device, self.phi)
+    action_values = self.agent.model(batch_states).q_values
+    return action_values.max(dim=1).values
+
+  def experience_replay(self, trajectory):
+    """ Add trajectory to the replay buffer and perform agent learning updates. """
+
+    for transition in trajectory:
+      self.step(*transition)
