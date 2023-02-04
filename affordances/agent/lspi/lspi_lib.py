@@ -55,7 +55,7 @@ def lstdq(next_actions,
 
 
 def lspi(seed, states, actions, rewards, next_states, dones,
-     state_action_matrix, n_dims, n_actions, projection, gamma=0.9):
+     state_action_matrix, n_dims, n_actions, projection, gamma=0.95):
   """Least Squares Policy Iteration with Random Projections."""
   next_actions = initialize_policy(seed, len(states), n_actions)
   theta = lstdq(next_actions, states, actions, rewards, next_states, dones,

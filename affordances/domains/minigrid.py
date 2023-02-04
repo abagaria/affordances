@@ -30,6 +30,7 @@ class MinigridInfoWrapper(Wrapper):
 
 
 class ResizeObsWrapper(ObservationWrapper):
+  """Resize the observation image to be (84, 84) and compatible with Atari."""
   def observation(self, observation):
     img = Image.fromarray(observation)
     return np.array(img.resize((84, 84), Image.BILINEAR))
@@ -50,7 +51,7 @@ class SparseRewardWrapper(Wrapper):
     return obs, float(reward > 0), terminated, truncated, info    
 
 
-def environment_builder(level_name='MiniGrid-Empty-16x16-v0', reward_fn='sparse'):
+def environment_builder(level_name='MiniGrid-Empty-8x8-v0', reward_fn='sparse'):
   env = gym.make(level_name)
   env = RGBImgObsWrapper(env) # Get pixel observations
   env = ImgObsWrapper(env) # Get rid of the 'mission' field

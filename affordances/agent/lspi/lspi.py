@@ -52,7 +52,7 @@ class LSPI:
     self._lspi_fn = lspi_lib.batched_lspi if self._many_goals_version else lspi_lib.lspi
 
     self.state_action_matrix = self.construct_state_action_matrix(self.next_states)
-    print(self.n_features, self.state_action_matrix.shape, n_actions)
+    # print(self.n_features, self.state_action_matrix.shape, n_actions)
 
   @property
   def n_features(self):
