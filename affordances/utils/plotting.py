@@ -2,13 +2,15 @@ import ipdb
 import collections
 import numpy as np
 import matplotlib.pyplot as plt
+from pfrl.replay_buffers.prioritized import PrioritizedReplayBuffer
 
 
 def parse_replay(replay):
   states = []
   x_locations = []
   y_locations = []
-  for transition in replay.memory:
+  memory = replay.memory.data if isinstance(replay, PrioritizedReplayBuffer) else replay.memory
+  for transition in memory:
     transition = transition[-1]  # n-step to single transition
     states.append(transition['next_state'])
     x_locations.append(transition['extra_info']['player_x'])
@@ -39,16 +41,16 @@ def visualize_value_func(agent, params, replay, episode, experiment_name, seed):
 
   x = [pos[0] for pos in value_dict]
   y = [pos[1] for pos in value_dict]
-  v = [np.mean(value_dict[pos]) for pos in value_dict]
+  v = [np.max(value_dict[pos]) for pos in value_dict]
   e = [np.std(value_dict[pos]) for pos in value_dict]
 
   plt.figure(figsize=(20,12))
   plt.subplot(121)
-  plt.scatter(x, y, c=v, s=50)
+  plt.scatter(x, y, c=v, s=1000, cmap=plt.cm.Reds, vmin=0, vmax=1)
   plt.colorbar()
-  plt.title('Value Mean')
+  plt.title('Value max')
   plt.subplot(122)
-  plt.scatter(x, y, c=e, s=50)
+  plt.scatter(x, y, c=e, s=1000, cmap=plt.cm.Reds, vmin=0, vmax=1)
   plt.colorbar()
   plt.title('Value Std Dev')
   plt.savefig(f'plots/{experiment_name}/{seed}/vf_{episode}.png')

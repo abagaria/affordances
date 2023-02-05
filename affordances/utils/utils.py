@@ -1,5 +1,6 @@
 """Misc utils."""
 
+import os
 import torch
 import numpy as np
 
@@ -36,3 +37,14 @@ def unpack_transitions(transitions):
     next_states.append(transition['next_state'].transpose((1, 2, 0)))
     dones.append(transition['is_state_terminal'])
   return states, actions, rewards, next_states, dones
+
+
+def create_log_dir(experiment_name):
+  path = os.path.join(os.getcwd(), experiment_name)
+  try:
+      os.makedirs(path, exist_ok=True)
+  except OSError:
+      pass
+  else:
+      print("Successfully created the directory %s " % path)
+  return path
