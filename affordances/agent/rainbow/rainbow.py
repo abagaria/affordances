@@ -61,7 +61,10 @@ class Rainbow:
   @staticmethod
   def phi(x):
     """ Observation pre-processing for convolutional layers. """
-    return np.asarray(x, dtype=np.float32) / 255.
+    if isinstance(x, np.ndarray):
+      return np.asarray(x, dtype=np.float32) / 255.
+    assert x.dtype == torch.float32 and x.max().item() <= 1, f'{x.dtype, x.max()}'
+    return x
 
   def act(self, state):
     """ Action selection method at the current state. """
