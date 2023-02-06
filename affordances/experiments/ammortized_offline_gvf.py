@@ -17,8 +17,8 @@ def create_agent(n_actions, env_steps=50_000):
     n_atoms=51, v_max=10., v_min=-10.,
     noisy_net_sigma=0.5, lr=6.25e-5, n_steps=3,
     betasteps=env_steps // 4,
-    replay_start_size=10_000, replay_buffer_size=int(1e6),
-    gpu=0, n_obs_channels=3, use_custom_batch_states=True
+    replay_start_size=1024, replay_buffer_size=int(5e5),
+    gpu=0, n_obs_channels=3, use_custom_batch_states=False
   )
   return Rainbow(n_actions, **kwargs)
 
@@ -36,6 +36,7 @@ def train(agent, init_learner, env, n_episodes=500):
     
     plotting_utils.visualize_value_func(
       init_learner,
+      None,
       init_learner.replay,
       episode, EXPERIMENT_NAME, SEED)
 

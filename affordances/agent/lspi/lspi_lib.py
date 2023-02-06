@@ -54,6 +54,12 @@ def lstdq(next_actions,
   return jnp.linalg.lstsq(a, b)[0]
 
 
+batched_lstdq = jax.vmap(
+  lstdq,
+  in_axes=(None, None, None, 0, None, 0, None, None, None, None)
+)
+
+
 def lspi(seed, states, actions, rewards, next_states, dones,
      state_action_matrix, n_dims, n_actions, projection, gamma=0.95):
   """Least Squares Policy Iteration with Random Projections."""

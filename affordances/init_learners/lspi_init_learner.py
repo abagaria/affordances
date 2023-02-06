@@ -53,6 +53,10 @@ class LSPIInitLearner:
     values = self.init_learner(states)
     return values.cpu().numpy()
 
+  def get_values(self, params, states):
+    del params
+    return self(states)
+
   def add_transition(self, obs, action, reward, next_obs, info):
     """Add transition (s, a, r, s', gamma) to the replay buffer."""
     self.replay.append(obs, action, reward, next_obs,
