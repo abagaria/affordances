@@ -2,6 +2,7 @@
 
 import os
 import torch
+import itertools
 import numpy as np
 
 
@@ -37,6 +38,11 @@ def unpack_transitions(transitions):
     next_states.append(transition['next_state'].transpose((1, 2, 0)))
     dones.append(transition['is_state_terminal'])
   return states, actions, rewards, next_states, dones
+
+
+def flatten(x, to_list=True):
+  x = itertools.chain.from_iterable(x)
+  return list(x) if to_list else x
 
 
 def create_log_dir(experiment_name):
