@@ -2,7 +2,7 @@ import numpy as np
 from PIL import Image
 import gymnasium as gym
 from gymnasium.core import Wrapper, ObservationWrapper
-from minigrid.wrappers import RGBImgObsWrapper, ImgObsWrapper
+from minigrid.wrappers import RGBImgObsWrapper, ImgObsWrapper, ReseedWrapper
 
 
 class MinigridInfoWrapper(Wrapper):
@@ -48,16 +48,39 @@ class SparseRewardWrapper(Wrapper):
   def step(self, action):
     # minigrid discounts the reward with a step count - undo that here
     obs, reward, terminated, truncated, info = self.env.step(action)
-    return obs, float(reward > 0), terminated, truncated, info    
+    return obs, float(reward > 0), terminated, truncated, info
 
 
-def environment_builder(level_name='MiniGrid-Empty-8x8-v0', reward_fn='sparse'):
+class GrayscaleWrapper(ObservationWrapper):
+  def observation(self, observation):
+    observation = observation.mean(axis=0)[np.newaxis, :, :]
+    return observation.astype(np.uint8)
+
+
+def determine_goal_pos(env):
+  """Convinence hacky function to determine the goal location."""
+  from minigrid.core.world_object import Goal
+  for i in range(env.grid.width):
+    for j in range(env.grid.height):
+      tile = env.grid.get(i, j)
+      if isinstance(tile, Goal):
+          return i, j
+
+
+def environment_builder(
+  level_name='MiniGrid-Empty-8x8-v0',
+  reward_fn='sparse',
+  grayscale=True
+):
   env = gym.make(level_name)
+  env = ReseedWrapper(env)  # To fix the goal distribution
   env = RGBImgObsWrapper(env) # Get pixel observations
   env = ImgObsWrapper(env) # Get rid of the 'mission' field
   if reward_fn == 'sparse':
     env = SparseRewardWrapper(env)
   env = ResizeObsWrapper(env)
   env = TransposeObsWrapper(env)
+  if grayscale:
+    env = GrayscaleWrapper(env)
   env = MinigridInfoWrapper(env)
   return env
