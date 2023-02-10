@@ -13,7 +13,7 @@ from pfrl.utils import batch_states as pfrl_batch_states
 class Rainbow:
   def __init__(self, n_actions, n_atoms, v_min, v_max, noisy_net_sigma, lr, 
          n_steps, betasteps, replay_start_size, replay_buffer_size, gpu,
-         n_obs_channels, use_custom_batch_states=True):
+         n_obs_channels, use_custom_batch_states=True, epsilon=0.):
     self.n_actions = n_actions
     n_channels = n_obs_channels
     self.use_custom_batch_states = use_custom_batch_states
@@ -21,7 +21,11 @@ class Rainbow:
     self.q_func = DistributionalDuelingDQN(n_actions, n_atoms, v_min, v_max, n_input_channels=n_channels)
     pnn.to_factorized_noisy(self.q_func, sigma_scale=noisy_net_sigma)
 
-    explorer = explorers.Greedy()
+    explorer = explorers.ConstantEpsilonGreedy(
+      epsilon=epsilon,
+      random_action_func=lambda: random.randint(0, n_actions - 1)
+    )
+
     opt = torch.optim.Adam(self.q_func.parameters(), lr, eps=1.5e-4)
 
     self.rbuf = replay_buffers.PrioritizedReplayBuffer(
