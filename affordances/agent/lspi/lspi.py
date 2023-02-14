@@ -97,8 +97,8 @@ class LSPI:
     print(f'Getting seek/avoid vfs for {n_goals} goals')
     
     values = self.get_values(theta)
-    seek_vf = np.array(values)[:, :n_goals]
-    avoid_vf = np.array(values)[:, n_goals:]
+    seek_vf = np.asarray(values)[:, :n_goals]
+    avoid_vf = np.asarray(values)[:, n_goals:]
 
     # Set the values at terminal states
     seek_dones = done_matrix.T[:, :n_goals]

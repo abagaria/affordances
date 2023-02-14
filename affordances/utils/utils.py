@@ -15,7 +15,7 @@ def rand_argmax(x):
 
 def tensorfy(x, device, transpose_to=None):
   if isinstance(x, list):
-    x = np.array(x)
+    x = np.asarray(x)
   if transpose_to is not None:
     x = x.transpose(transpose_to)
   if isinstance(x, np.ndarray):

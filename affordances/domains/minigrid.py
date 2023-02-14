@@ -33,7 +33,7 @@ class ResizeObsWrapper(ObservationWrapper):
   """Resize the observation image to be (84, 84) and compatible with Atari."""
   def observation(self, observation):
     img = Image.fromarray(observation)
-    return np.array(img.resize((84, 84), Image.BILINEAR))
+    return np.asarray(img.resize((84, 84), Image.BILINEAR))
 
 
 class TransposeObsWrapper(ObservationWrapper):

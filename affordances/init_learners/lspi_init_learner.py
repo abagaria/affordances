@@ -106,7 +106,7 @@ class LSPIInitLearner:
     params = lspi_agent()
 
     lspi_values = utils.tensorfy(
-        np.array(lspi_agent.get_values(params)), device=self.device)
+        np.asarray(lspi_agent.get_values(params)), device=self.device)
 
     # print(f'Took {time.time() - t0}s to get LSPI values')
     return parsed_transitions[0], lspi_values

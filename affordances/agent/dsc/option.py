@@ -68,7 +68,7 @@ class Option:
 
     def get_first_state_in_term_classifier(examples):
       """Given a list of (obs, info) tuples, find the 1st inside the term set."""
-      observations = np.array([eg[0] for eg in examples])
+      observations = [eg[0] for eg in examples]
       infos = [eg[1] for eg in examples]
       predictions = self.parent_initiation_learner.pessimistic_predict(
         observations)

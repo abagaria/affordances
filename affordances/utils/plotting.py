@@ -15,7 +15,7 @@ def parse_replay(replay):
     states.append(transition['next_state'])
     x_locations.append(transition['extra_info']['player_x'])
     y_locations.append(transition['extra_info']['player_y'])
-  return np.array(states), np.array(x_locations), np.array(y_locations)
+  return np.asarray(states), np.asarray(x_locations), np.asarray(y_locations)
 
 
 def visualize_value_func(agent, params, replay, episode, experiment_name, seed):
@@ -34,7 +34,7 @@ def visualize_value_func(agent, params, replay, episode, experiment_name, seed):
 
   for state_chunk, x_chunk, y_chunk in zip(state_chunks, x_chunks, y_chunks):
     value_chunk = agent.get_values(params, state_chunk)
-    value_list = np.array(value_chunk).tolist()
+    value_list = np.asarray(value_chunk).tolist()
     values.extend(value_list)
     for x, y, value in zip(x_chunk, y_chunk, value_list):
       value_dict[(x, y)].append(value)

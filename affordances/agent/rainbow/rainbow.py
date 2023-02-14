@@ -59,7 +59,7 @@ class Rainbow:
   @staticmethod
   def batch_states(states, device, phi):
     assert isinstance(states, list), type(states)
-    features = np.array([phi(s) for s in states])
+    features = np.asarray([phi(s) for s in states])
     return torch.as_tensor(features).to(device)
 
   @staticmethod
