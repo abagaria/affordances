@@ -14,7 +14,7 @@ class ConvInitiationClassifier(InitiationLearner):
     optimistic_threshold: float,
     pessimistic_threshold: float,
     n_input_channels: int = 1,
-    maxlen: int = 20
+    maxlen: int = 10
   ):
     self.device = device
     self.optimistic_threshold = optimistic_threshold

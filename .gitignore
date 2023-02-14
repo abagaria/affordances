@@ -132,3 +132,5 @@ dmypy.json
 plots/*
 logs/*
 tags
+profile.json
+profile.html
