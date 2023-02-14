@@ -44,6 +44,7 @@ class DSCAgent:
 
     self.uvfa_policy = self.create_uvfa_policy(n_actions=env.action_space.n)
 
+    self._init_replay_buffer = None
     if maintain_init_replay:
       self._init_replay_buffer = ReplayBuffer(capacity=int(1e4))
 
