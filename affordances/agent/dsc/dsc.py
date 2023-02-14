@@ -20,7 +20,7 @@ class DSCAgent:
     gpu: int = 0,
     n_input_channels: int = 3,
     maintain_init_replay: bool = True,
-    max_n_options: int = 3
+    max_n_options: int = 10
   ):
 
     self._env = env

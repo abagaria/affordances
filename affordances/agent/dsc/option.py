@@ -52,6 +52,8 @@ class Option:
   def is_term_true(self, state, info):
     if self._option_idx <= 1:
       return self.parent_initiation_learner(info)
+    
+    # TODO(ab): task goal should be in every option's termination set
     return self.parent_initiation_learner.pessimistic_predict([state])
 
   def option_reward_func(self, state, info, goal, goal_info):

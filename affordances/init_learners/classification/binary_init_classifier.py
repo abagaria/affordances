@@ -4,11 +4,11 @@ import collections
 import numpy as np
 
 from affordances.utils import utils
-from affordances.init_learners.init_learner import InitiationLearner
+from affordances.init_learners.classification.init_classifier import InitiationClassifier
 from affordances.init_learners.classification.conv_binary_classifier import ConvClassifier
 
 
-class ConvInitiationClassifier(InitiationLearner):
+class ConvInitiationClassifier(InitiationClassifier):
   def __init__(self,
     device, 
     optimistic_threshold: float,
@@ -21,11 +21,9 @@ class ConvInitiationClassifier(InitiationLearner):
     self.pessimistic_threshold = pessimistic_threshold
     self.n_input_channels = n_input_channels
     
-    self.positive_examples = collections.deque([], maxlen=maxlen)
-    self.negative_examples = collections.deque([], maxlen=maxlen)
     self.classifier = ConvClassifier(device, None, n_input_channels)
     
-    super().__init__()
+    super().__init__(max_n_trajectories=maxlen)
 
   def _predict(self, states: np.ndarray, threshold) -> np.ndarray:
     state_tensor = utils.tensorfy(states, self.device)
