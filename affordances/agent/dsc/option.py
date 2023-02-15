@@ -53,13 +53,29 @@ class Option:
     if self._option_idx <= 1:
       return self.parent_initiation_learner(info)
     
-    # TODO(ab): task goal should be in every option's termination set
+    # TODO(ab): maybe task goal should be in every option's termination set
     return self.parent_initiation_learner.pessimistic_predict([state])
 
-  def option_reward_func(self, state, info, goal, goal_info):
+  def at_local_goal(self, state, info, goal, goal_info):
     inputs = (state, goal) if self._goal_attainment_classifier.use_obs else (info, goal_info)
     reached_goal = self._goal_attainment_classifier(*inputs)
     return reached_goal and self.is_term_true(state, info)
+  
+  def option_reward_function(self, r_ext: float, reached: bool, rmax: float = 1.):
+    """Option reward function assuming a normalized exploration bonus.
+
+    Args:
+      r_ext: extrinsic reward
+      reached: whether you reached the sampled goal in the termination set
+      rmax: reward for reaching the task goal
+    """
+    if self._option_idx > 1 and r_ext >= rmax:
+      # local options should not be rewarded for reaching the task goal
+      return r_ext - rmax + float(reached)  # (rext - rmax) is the bonus
+    elif self._option_idx > 1:
+      return r_ext + float(reached)
+    assert self._option_idx in (0, 1), self._option_idx
+    return r_ext
 
   def act(self, state, goal):
     augmented_state = self.get_augmeted_state(state, goal)
@@ -112,7 +128,7 @@ class Option:
         init_replay.append(state, action, reward, next_state,
           is_state_terminal=info['terminated'], extra_info=info)
   
-      reached = self.option_reward_func(next_state, info, goal, goal_info)
+      reached = self.at_local_goal(next_state, info, goal, goal_info)
 
       state = next_state
       reset = info['needs_reset']
@@ -144,12 +160,13 @@ class Option:
 
   def experience_replay(self, transitions, goal, goal_info):
     relabeled_trajectory = []
-    for state, action, _, next_state, info in transitions:
+    for state, action, r_ext, next_state, info in transitions:
       sg = self.get_augmeted_state(state, goal)
       nsg = self.get_augmeted_state(next_state, goal)
-      reached = self.option_reward_func(next_state, info, goal, goal_info)
+      reached = self.at_local_goal(next_state, info, goal, goal_info)
+      reward = self.option_reward_function(r_ext, reached)
       relabeled_trajectory.append((
-        sg, action, float(reached), nsg, reached, info['needs_reset']))
+        sg, action, reward, nsg, reached, info['needs_reset']))
       if reached:
         break
     self._solver.experience_replay(relabeled_trajectory)

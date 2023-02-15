@@ -1,8 +1,9 @@
+import math
 import numpy as np
 from PIL import Image
 import gymnasium as gym
 from gymnasium.core import Wrapper, ObservationWrapper
-from minigrid.wrappers import RGBImgObsWrapper, ImgObsWrapper, ReseedWrapper
+from minigrid.wrappers import RGBImgObsWrapper, ImgObsWrapper, ReseedWrapper, StateBonus
 
 
 class MinigridInfoWrapper(Wrapper):
@@ -55,6 +56,35 @@ class GrayscaleWrapper(ObservationWrapper):
   def observation(self, observation):
     observation = observation.mean(axis=0)[np.newaxis, :, :]
     return observation.astype(np.uint8)
+  
+class ScaledStateBonus(StateBonus):
+  """Slight mod of StateBonus: scale the count-based bonus before adding."""
+
+  def __init__(self, env, reward_scale):
+    super().__init__(env)
+    self.reward_scale = reward_scale
+
+  def step(self, action):
+    obs, reward, terminated, truncated, info = self.env.step(action)
+
+    # Tuple based on which we index the counts
+    # We use the position after an update
+    env = self.unwrapped
+    tup = tuple(env.agent_pos)
+
+    # Get the count for this key
+    pre_count = 0
+    if tup in self.counts:
+        pre_count = self.counts[tup]
+
+    # Update the count for this key
+    new_count = pre_count + 1
+    self.counts[tup] = new_count
+
+    bonus = 1 / math.sqrt(new_count)
+    reward += (self.reward_scale * bonus)
+
+    return obs, reward, terminated, truncated, info
 
 
 def determine_goal_pos(env):
@@ -70,10 +100,13 @@ def determine_goal_pos(env):
 def environment_builder(
   level_name='MiniGrid-Empty-8x8-v0',
   reward_fn='sparse',
-  grayscale=True
+  grayscale=True,
+  add_count_based_bonus=True,
+  exploration_reward_scale=1e-3,
+  seed=42
 ):
   env = gym.make(level_name)
-  env = ReseedWrapper(env)  # To fix the goal distribution
+  env = ReseedWrapper(env, seeds=[seed])  # To fix the start-goal config
   env = RGBImgObsWrapper(env) # Get pixel observations
   env = ImgObsWrapper(env) # Get rid of the 'mission' field
   if reward_fn == 'sparse':
@@ -82,5 +115,7 @@ def environment_builder(
   env = TransposeObsWrapper(env)
   if grayscale:
     env = GrayscaleWrapper(env)
+  if add_count_based_bonus:
+    env = ScaledStateBonus(env, exploration_reward_scale)
   env = MinigridInfoWrapper(env)
   return env
