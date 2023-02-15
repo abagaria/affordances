@@ -1,4 +1,3 @@
-import pickle
 import argparse
 
 from affordances.utils import utils
@@ -79,6 +78,8 @@ if __name__ == '__main__':
   utils.create_log_dir(f'plots/{args.experiment_name}/{args.seed}')
   utils.create_log_dir(f'logs/{args.experiment_name}')
   utils.create_log_dir(f'logs/{args.experiment_name}/{args.seed}')
+
+  utils.set_random_seed(args.seed)
 
   environment = environment_builder(
     level_name=args.environment_name, seed=args.seed)

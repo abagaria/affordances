@@ -68,3 +68,13 @@ def safe_zip_write(filename, data):
   with gzip.open(filename_temp, 'wb+') as f:
     pickle.dump(data, f)
   os.replace(filename_temp, filename)
+
+
+def set_random_seed(seed):
+  import torch
+  import random
+  import numpy as np
+  
+  random.seed(seed)
+  np.random.seed(seed)
+  torch.manual_seed(seed)
