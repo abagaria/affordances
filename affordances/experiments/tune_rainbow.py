@@ -51,13 +51,14 @@ def train(agent: Rainbow, env, n_episodes):
             rewards=episodic_rewards,
             current_episode=episode,
           ), f)
-    return episodic_rewards
+  return episodic_rewards
 
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser()
   parser.add_argument('--experiment_name', type=str)
   parser.add_argument('--seed', type=int, default=42)
+  parser.add_argument('--gpu', type=int, default=0)
   parser.add_argument('--environment_name', type=str, default='MiniGrid-Empty-8x8-v0')
   parser.add_argument('--n_episodes', type=int, default=5000)
   parser.add_argument('--lr', type=float, default=6.25e-5)
