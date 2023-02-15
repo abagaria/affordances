@@ -27,23 +27,36 @@ def train(agent: DSCAgent, env, n_episodes):
     undiscounted_return = sum(episode_rewards)
     rewards.append(undiscounted_return)
     print(f'Episode: {episode}',
+      f"InitPos': {info0['player_pos']}",
       f"FinalPos: {info['player_pos']}",
       f'Reward: {undiscounted_return}')
     log(agent, rewards, episode)
   return rewards
 
 
-def log(agent, returns_so_far, episode):
-  if args.plot_initiation_function:
+def log(agent: DSCAgent, returns_so_far: list, episode: int):
+  """Log DSC progress: includes learning curve, plotting, checkpointing."""
+  
+  log_dir = f'logs/{args.experiment_name}/{args.seed}'
+
+  utils.safe_zip_write(
+    f'{log_dir}/log.pkl',
+    dict(
+      rewards=returns_so_far,
+      current_episode=episode
+    )
+  )
+
+  if args.checkpoint_init_learners and episode % args.checkpoint_frequency == 0:
     for option in agent.mature_options:
-      plotting_utils.visualize_initiation_set(option, agent._init_replay_buffer,
-        episode, args.experiment_name, args.seed)
-  with open(f'logs/{args.experiment_name}/{args.seed}/log.pkl', 'wb+') as f:
-    pickle.dump(
-      dict(
-        rewards=returns_so_far,
-        current_episode=episode,
-      ), f)
+      filename = f'{log_dir}/option_{option.option_idx}_init.pth'
+      option.initiation_learner.save(filename)
+
+  if args.plot_initiation_function and episode % args.plotting_frequency == 0:
+    [plotting_utils.visualize_initiation_set(
+      option, agent._init_replay_buffer,
+      episode, args.experiment_name, args.seed
+    ) for option in agent.mature_options]
 
 
 if __name__ == '__main__':
@@ -57,6 +70,9 @@ if __name__ == '__main__':
   parser.add_argument('--gpu_id', type=int, default=0)
   parser.add_argument('--n_episodes', type=int, default=500)
   parser.add_argument('--plot_initiation_function', action='store_true', default=False)
+  parser.add_argument('--checkpoint_init_learners', action='store_true', default=False)
+  parser.add_argument('--checkpoint_frequency', type=int, default=100)
+  parser.add_argument('--plotting_frequency', type=int, default=1)
   args = parser.parse_args()
 
   utils.create_log_dir(f'plots/{args.experiment_name}')
@@ -64,7 +80,8 @@ if __name__ == '__main__':
   utils.create_log_dir(f'logs/{args.experiment_name}')
   utils.create_log_dir(f'logs/{args.experiment_name}/{args.seed}')
 
-  environment = environment_builder(level_name=args.environment_name)
+  environment = environment_builder(
+    level_name=args.environment_name, seed=args.seed)
   start_state, start_info = environment.reset()
   goal_info_dict = dict(player_pos=determine_goal_pos(environment))
   dsc_agent = create_agent(environment, start_state, start_info, goal_info_dict)
