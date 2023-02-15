@@ -67,3 +67,12 @@ class ConvInitiationClassifier(InitiationClassifier):
 
       if self.classifier.should_train(Y):
         self.classifier.fit(X, Y)
+
+  def save(self, filename: str):
+    torch.save(self.classifier.model.state_dict(), filename)
+
+  def load(self, filename: str):
+    self.classifier = ConvClassifier(self.device, None, self.n_input_channels)
+    self.classifier.model.load_state_dict(
+      torch.load(filename)
+    )

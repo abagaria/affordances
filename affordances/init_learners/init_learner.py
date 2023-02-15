@@ -15,3 +15,5 @@ class InitiationLearner:
   def update(self):
     raise NotImplementedError()
 
+  def save(self):
+    raise NotImplementedError()
