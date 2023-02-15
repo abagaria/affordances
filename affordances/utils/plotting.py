@@ -15,7 +15,7 @@ def parse_replay(replay):
     states.append(transition['next_state'])
     x_locations.append(transition['extra_info']['player_x'])
     y_locations.append(transition['extra_info']['player_y'])
-  return np.asarray(states), np.asarray(x_locations), np.asarray(y_locations)
+  return states, x_locations, y_locations
 
 
 def visualize_value_func(agent, params, replay, episode, experiment_name, seed):
@@ -108,3 +108,4 @@ def visualize_initiation_set(option, replay, episode, experiment_name, seed):
 
   plt.savefig(f'plots/{experiment_name}/{seed}/{option}_init_{episode}.png')
   plt.close()
+  # return x, y, pv, ov
