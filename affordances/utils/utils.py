@@ -1,7 +1,9 @@
 """Misc utils."""
 
 import os
+import gzip
 import torch
+import pickle
 import itertools
 import numpy as np
 
@@ -54,3 +56,15 @@ def create_log_dir(experiment_name):
   else:
       print("Successfully created the directory %s " % path)
   return path
+
+
+def safe_zip_write(filename, data):
+  """Safely writes a file to disk.
+  Args:
+    filename: str, the name of the file to write.
+    data: the data to write to the file.
+  """
+  filename_temp = f"{filename}.tmp.gz"
+  with gzip.open(filename_temp, 'wb+') as f:
+    pickle.dump(data, f)
+  os.replace(filename_temp, filename)
