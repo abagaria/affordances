@@ -1,4 +1,4 @@
-import pickle
+import os
 import argparse
 
 from affordances.utils import utils
@@ -29,6 +29,7 @@ def create_agent(
 
 def train(agent: Rainbow, env, n_episodes):
   episodic_rewards = []
+  n_steps = 0
   for episode in range(n_episodes):
     done = False
     episode_reward = 0.
@@ -38,6 +39,7 @@ def train(agent: Rainbow, env, n_episodes):
       next_obs, reward, done, info = env.step(action)
       agent.step(obs, action, reward, next_obs, done, info['needs_reset'])
 
+      n_steps += 1
       obs = next_obs
       episode_reward += reward
     
@@ -45,18 +47,21 @@ def train(agent: Rainbow, env, n_episodes):
     print(f'Episode {episode} Reward {episode_reward}')
 
     if episode > 0 and episode % 10 == 0:
-      with open(f'logs/{args.experiment_name}/{args.seed}/log.pkl', 'wb+') as f:
-        pickle.dump(
-          dict(
+      utils.safe_zip_write(
+        os.path.join(g_log_dir, 'log.pkl'),
+        dict(
             rewards=episodic_rewards,
             current_episode=episode,
-          ), f)
+            current_step_count=n_steps
+          )
+      )
   return episodic_rewards
 
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser()
   parser.add_argument('--experiment_name', type=str)
+  parser.add_argument('--sub_dir', type=str, default='', help='sub dir for sweeps')
   parser.add_argument('--seed', type=int, default=42)
   parser.add_argument('--gpu', type=int, default=0)
   parser.add_argument('--environment_name', type=str, default='MiniGrid-Empty-8x8-v0')
@@ -65,8 +70,12 @@ if __name__ == '__main__':
   parser.add_argument('--sigma', type=float, default=0.5)
   args = parser.parse_args()
 
-  utils.create_log_dir(f'logs/{args.experiment_name}')
-  utils.create_log_dir(f'logs/{args.experiment_name}/{args.seed}')
+  g_log_dir = os.path.join('logs', args.experiment_name, args.sub_dir, str(args.seed))
+
+  utils.create_log_dir('logs')
+  utils.create_log_dir(os.path.join('logs', args.experiment_name))
+  utils.create_log_dir(os.path.join('logs', args.experiment_name, args.sub_dir))
+  utils.create_log_dir(g_log_dir)
 
   environment = environment_builder(args.environment_name)
   rainbow_agent = create_agent(
