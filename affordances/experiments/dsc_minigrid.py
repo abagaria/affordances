@@ -1,3 +1,4 @@
+import os
 import argparse
 
 from affordances.utils import utils
@@ -35,11 +36,9 @@ def train(agent: DSCAgent, env, n_episodes):
 
 def log(agent: DSCAgent, returns_so_far: list, episode: int):
   """Log DSC progress: includes learning curve, plotting, checkpointing."""
-  
-  log_dir = f'logs/{args.experiment_name}/{args.seed}'
 
   utils.safe_zip_write(
-    f'{log_dir}/log.pkl',
+    f'{g_log_dir}/log.pkl',
     dict(
       rewards=returns_so_far,
       current_episode=episode
@@ -48,7 +47,7 @@ def log(agent: DSCAgent, returns_so_far: list, episode: int):
 
   if args.checkpoint_init_learners and episode % args.checkpoint_frequency == 0:
     for option in agent.mature_options:
-      filename = f'{log_dir}/option_{option.option_idx}_init.pth'
+      filename = f'{g_log_dir}/option_{option.option_idx}_init.pth'
       option.initiation_learner.save(filename)
 
   if args.plot_initiation_function and episode % args.plotting_frequency == 0:
@@ -61,23 +60,32 @@ def log(agent: DSCAgent, returns_so_far: list, episode: int):
 if __name__ == '__main__':
   parser = argparse.ArgumentParser()
   parser.add_argument('--experiment_name', type=str)
+  parser.add_argument('--sub_dir', type=str, default='', help='sub dir for sweeps')
   parser.add_argument('--seed', type=int, default=42)
   parser.add_argument('--environment_name', type=str, default='MiniGrid-Empty-8x8-v0')
   parser.add_argument('--gestation_period', type=int, default=5)
   parser.add_argument('--timeout', type=int, default=50)
   parser.add_argument('--init_learner_type', type=str, default='binary')
   parser.add_argument('--gpu_id', type=int, default=0)
-  parser.add_argument('--n_episodes', type=int, default=500)
+  parser.add_argument('--n_episodes', type=int, default=5000)
   parser.add_argument('--plot_initiation_function', action='store_true', default=False)
   parser.add_argument('--checkpoint_init_learners', action='store_true', default=False)
   parser.add_argument('--checkpoint_frequency', type=int, default=100)
   parser.add_argument('--plotting_frequency', type=int, default=1)
   args = parser.parse_args()
 
-  utils.create_log_dir(f'plots/{args.experiment_name}')
-  utils.create_log_dir(f'plots/{args.experiment_name}/{args.seed}')
-  utils.create_log_dir(f'logs/{args.experiment_name}')
-  utils.create_log_dir(f'logs/{args.experiment_name}/{args.seed}')
+  g_log_dir = os.path.join('logs', args.experiment_name, args.sub_dir, str(args.seed))
+  g_plot_dir = os.path.join('plots', args.experiment_name, args.sub_dir, str(args.seed))
+
+  utils.create_log_dir('logs')
+  utils.create_log_dir(os.path.join('logs', args.experiment_name))
+  utils.create_log_dir(os.path.join('logs', args.experiment_name, args.sub_dir))
+  utils.create_log_dir(g_log_dir)
+
+  utils.create_log_dir('plots')
+  utils.create_log_dir(os.path.join('plots', args.experiment_name))
+  utils.create_log_dir(os.path.join('plots', args.experiment_name, args.sub_dir))
+  utils.create_log_dir(g_plot_dir)
 
   utils.set_random_seed(args.seed)
 
