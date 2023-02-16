@@ -78,6 +78,8 @@ if __name__ == '__main__':
   utils.create_log_dir(os.path.join('logs', args.experiment_name, args.sub_dir))
   utils.create_log_dir(g_log_dir)
 
+  utils.set_random_seed(args.seed)
+
   environment = environment_builder(
     args.environment_name, exploration_reward_scale=args.bonus_scale)
   rainbow_agent = create_agent(
