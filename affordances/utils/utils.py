@@ -70,6 +70,13 @@ def safe_zip_write(filename, data):
   os.replace(filename_temp, filename)
 
 
+def parse_log_file(experiment_name, sub_dir, seed):
+  fname = os.path.join('logs', experiment_name, sub_dir, str(seed), 'log.pkl')
+  with gzip.open(fname, 'rb') as f:
+    log_dict = pickle.load(f)
+  return log_dict
+
+
 def set_random_seed(seed):
   import torch
   import random

@@ -68,6 +68,7 @@ if __name__ == '__main__':
   parser.add_argument('--n_episodes', type=int, default=5000)
   parser.add_argument('--lr', type=float, default=6.25e-5)
   parser.add_argument('--sigma', type=float, default=0.5)
+  parser.add_argument('--bonus_scale', type=float, default=1e-3)
   args = parser.parse_args()
 
   g_log_dir = os.path.join('logs', args.experiment_name, args.sub_dir, str(args.seed))
@@ -77,7 +78,8 @@ if __name__ == '__main__':
   utils.create_log_dir(os.path.join('logs', args.experiment_name, args.sub_dir))
   utils.create_log_dir(g_log_dir)
 
-  environment = environment_builder(args.environment_name)
+  environment = environment_builder(
+    args.environment_name, exploration_reward_scale=args.bonus_scale)
   rainbow_agent = create_agent(
     environment.action_space.n,
     gpu=args.gpu,
