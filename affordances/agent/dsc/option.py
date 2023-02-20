@@ -17,7 +17,8 @@ class Option:
     parent_initiation_learner: InitiationLearner,
     goal_attainment_classifier: GoalAttainmentClassifier,
     gestation_period: int,
-    timeout: int):
+    timeout: int,
+    start_state_classifier):
       self._timeout = timeout
       self._solver = uvfa_policy
       self._option_idx = option_idx
@@ -26,6 +27,12 @@ class Option:
       
       self.initiation_learner = initiation_learner
       self.parent_initiation_learner = parent_initiation_learner
+      
+      # function that maps current info to {0, 1}
+      self._start_state_classifier = start_state_classifier
+
+      self.is_last_option = False
+      self.expansion_classifier = None
 
       self._is_global_option = option_idx == 0
       
@@ -40,6 +47,9 @@ class Option:
   
   def optimistic_is_init_true(self, state, info):
     if self._is_global_option or self.training_phase == 'gestation':
+      return True
+
+    if self.is_last_option and self._start_state_classifier(info):
       return True
 
     decision1 = self.initiation_learner.optimistic_predict([state]) 
@@ -190,6 +200,12 @@ class Option:
     self.initiation_learner.add_trajectory(transitions, success)
     self.initiation_learner.update()
 
+  def should_expand_initiation(self, s0: np.ndarray, info0: dict):
+    """Check if the option can initiate at the start-state."""
+    if self.training_phase != 'gestation':
+      return self.pessimistic_is_init_true(s0, info0)
+    return False
+  
   def get_augmeted_state(self, state, goal):
     assert state.shape == (1, 84, 84), state.shape
     return np.concatenate((state, goal), axis=0)
