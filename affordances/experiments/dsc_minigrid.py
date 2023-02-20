@@ -12,8 +12,10 @@ def create_agent(env, s0, i0, goal_info):
   goal_attainment_classifier = DiscreteInfoAttainmentClassifier(
     key_name='player_pos')
   task_goal_classifier = lambda info: goal_attainment_classifier(info, goal_info)
+  start_state_classifier = lambda info: goal_attainment_classifier(info, i0)
 
-  return DSCAgent(env, s0, i0, task_goal_classifier, goal_attainment_classifier,
+  return DSCAgent(env, s0, i0, start_state_classifier, task_goal_classifier,
+    goal_attainment_classifier,
     args.gestation_period, args.timeout, args.init_learner_type,
     goal_info, args.gpu_id, n_input_channels=1,
     maintain_init_replay=args.plot_initiation_function)
@@ -38,7 +40,7 @@ def log(agent: DSCAgent, returns_so_far: list, episode: int):
   """Log DSC progress: includes learning curve, plotting, checkpointing."""
 
   utils.safe_zip_write(
-    f'{g_log_dir}/log.pkl',
+    f'{g_log_dir}/log_seed{args.seed}.pkl',
     dict(
       rewards=returns_so_far,
       current_episode=episode
@@ -47,14 +49,9 @@ def log(agent: DSCAgent, returns_so_far: list, episode: int):
 
   if args.checkpoint_init_learners and episode % args.checkpoint_frequency == 0:
     for option in agent.mature_options:
-      filename = f'{g_log_dir}/option_{option.option_idx}_init.pth'
+      filename = f'{g_log_dir}/option_{option.option_idx}_init_{episode}.pth'
       option.initiation_learner.save(filename)
-
-  if args.plot_initiation_function and episode % args.plotting_frequency == 0:
-    [plotting_utils.visualize_initiation_set(
-      option, agent._init_replay_buffer,
-      episode, args.experiment_name, args.seed
-    ) for option in agent.mature_options]
+    agent._init_replay_buffer.save(f'{g_log_dir}/init_replay_{episode}.pkl')
 
 
 if __name__ == '__main__':
@@ -72,25 +69,22 @@ if __name__ == '__main__':
   parser.add_argument('--checkpoint_init_learners', action='store_true', default=False)
   parser.add_argument('--checkpoint_frequency', type=int, default=100)
   parser.add_argument('--plotting_frequency', type=int, default=1)
+  parser.add_argument('--log_dir', type=str, default='/gpfs/data/gdk/abagaria/affordances_logs')
+  parser.add_argument('--exploration_bonus_scale', default=1e-3, type=float)
   args = parser.parse_args()
 
-  g_log_dir = os.path.join('logs', args.experiment_name, args.sub_dir, str(args.seed))
-  g_plot_dir = os.path.join('plots', args.experiment_name, args.sub_dir, str(args.seed))
+  g_log_dir = os.path.join(args.log_dir, args.experiment_name, args.sub_dir)
 
-  utils.create_log_dir('logs')
-  utils.create_log_dir(os.path.join('logs', args.experiment_name))
-  utils.create_log_dir(os.path.join('logs', args.experiment_name, args.sub_dir))
+  utils.create_log_dir(args.log_dir)
+  utils.create_log_dir(os.path.join(args.log_dir, args.experiment_name))
+  utils.create_log_dir(os.path.join(args.log_dir, args.experiment_name, args.sub_dir))
   utils.create_log_dir(g_log_dir)
-
-  utils.create_log_dir('plots')
-  utils.create_log_dir(os.path.join('plots', args.experiment_name))
-  utils.create_log_dir(os.path.join('plots', args.experiment_name, args.sub_dir))
-  utils.create_log_dir(g_plot_dir)
 
   utils.set_random_seed(args.seed)
 
   environment = environment_builder(
-    level_name=args.environment_name, seed=args.seed)
+    level_name=args.environment_name, seed=args.seed,
+    exploration_reward_scale=args.exploration_bonus_scale)
   start_state, start_info = environment.reset()
   goal_info_dict = dict(player_pos=determine_goal_pos(environment))
   dsc_agent = create_agent(environment, start_state, start_info, goal_info_dict)
