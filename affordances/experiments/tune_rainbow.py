@@ -48,7 +48,7 @@ def train(agent: Rainbow, env, n_episodes):
 
     if episode > 0 and episode % 10 == 0:
       utils.safe_zip_write(
-        os.path.join(g_log_dir, 'log.pkl'),
+        os.path.join(g_log_dir, f'log_seed{args.seed}.pkl'),
         dict(
             rewards=episodic_rewards,
             current_episode=episode,
@@ -69,13 +69,14 @@ if __name__ == '__main__':
   parser.add_argument('--lr', type=float, default=6.25e-5)
   parser.add_argument('--sigma', type=float, default=0.5)
   parser.add_argument('--bonus_scale', type=float, default=1e-3)
+  parser.add_argument('--log_dir', type=str, default='/gpfs/data/gdk/abagaria/affordances_logs')
   args = parser.parse_args()
 
-  g_log_dir = os.path.join('logs', args.experiment_name, args.sub_dir, str(args.seed))
+  g_log_dir = os.path.join(args.log_dir, args.experiment_name, args.sub_dir)
 
-  utils.create_log_dir('logs')
-  utils.create_log_dir(os.path.join('logs', args.experiment_name))
-  utils.create_log_dir(os.path.join('logs', args.experiment_name, args.sub_dir))
+  utils.create_log_dir(args.log_dir)
+  utils.create_log_dir(os.path.join(args.log_dir, args.experiment_name))
+  utils.create_log_dir(os.path.join(args.log_dir, args.experiment_name, args.sub_dir))
   utils.create_log_dir(g_log_dir)
 
   utils.set_random_seed(args.seed)
