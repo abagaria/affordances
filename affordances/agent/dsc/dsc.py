@@ -11,6 +11,7 @@ class DSCAgent:
     env,
     start_state: np.ndarray,
     start_info: dict,
+    start_state_classifier,
     task_goal_classifier,
     goal_attainment_classifier,
     gestation_period: int,
@@ -25,8 +26,6 @@ class DSCAgent:
 
     self._env = env
     self._timeout = timeout
-    self._start_state = start_state
-    self._start_state_info = start_info
     self._gestation_period = gestation_period
     self._n_input_channels = n_input_channels
     self._goal_info_dict = goal_info_dict
@@ -37,7 +36,12 @@ class DSCAgent:
     self._device = f'cuda:{gpu}' if gpu > -1 else 'cpu'
     
     self.task_goal_classifier = task_goal_classifier
+    self.start_state_classifier = start_state_classifier
     self.goal_attainment_classifier = goal_attainment_classifier
+
+    # TODO(ab): [refactor] store these inside the start_state_clf object
+    self.start_state = start_state
+    self.start_state_info = start_info
 
     self._init_learner_type = init_learner_type
     assert init_learner_type in ('binary', 'td0', 'lstd-rp', 'neural-lstd', 'weighted-binary')
@@ -82,7 +86,7 @@ class DSCAgent:
       self.manage_chain_after_rollout(option)
 
       rewards.append(reward)
-      print(f'{option} Goal: {subgoal[1]} Success: {reached}')
+      print(f"{option} Goal: {subgoal[1]['player_pos']} Reached: {info['player_pos']}")
 
     return state, info, rewards
 
@@ -94,13 +98,17 @@ class DSCAgent:
       return random.choice(samples)
     return np.zeros_like(state), self._goal_info_dict
 
-  def manage_chain_after_rollout(self, executed_option: Option):
+  def manage_chain_after_rollout(self, option: Option):
     """Chain maintainence: gestate/create new options."""
 
-    if executed_option in self.new_options and \
-      executed_option.training_phase != 'gestation':
-      self.new_options.remove(executed_option)
-      self.mature_options.append(executed_option)
+    if option in self.new_options and option.training_phase != 'gestation':
+      self.new_options.remove(option)
+      self.mature_options.append(option)
+
+    if option.training_phase != 'gestation' and not option._is_global_option \
+      and option.should_expand_initiation(self.start_state, self.start_state_info):
+      print(f'Expanding the skill chain to fix {option} to s0')
+      option.is_last_option = True
     
     if self.should_create_new_option():
       new_option = self.create_new_option()
@@ -121,7 +129,7 @@ class DSCAgent:
   def contains_init_state(self):
     """Whether the start state inside any option's initiation set."""
     for option in self.mature_options:
-      if option.pessimistic_is_init_true(self._start_state, self._start_state_info):
+      if option.optimistic_is_init_true(self.start_state, self.start_state_info):
         return True
     return False
 
@@ -138,14 +146,16 @@ class DSCAgent:
       initiation_learner=self.create_init_classifier(),
       parent_initiation_learner=termination_classifier,
       goal_attainment_classifier=self.goal_attainment_classifier,
-      gestation_period=self._gestation_period, timeout=self._timeout)
+      gestation_period=self._gestation_period, timeout=self._timeout,
+      start_state_classifier=self.start_state_classifier)
 
   def create_global_option(self):
     return Option(option_idx=0, uvfa_policy=self.uvfa_policy,
       initiation_learner=None,
       parent_initiation_learner=self.task_goal_classifier,
       goal_attainment_classifier=self.goal_attainment_classifier,
-      gestation_period=self._gestation_period, timeout=self._timeout // 2)
+      gestation_period=self._gestation_period, timeout=self._timeout // 2,
+      start_state_classifier=self.start_state_classifier)
 
   def create_uvfa_policy(self, n_actions, env_steps=50_000):
     kwargs = dict(
