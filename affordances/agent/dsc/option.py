@@ -70,22 +70,6 @@ class Option:
     inputs = (state, goal) if self._goal_attainment_classifier.use_obs else (info, goal_info)
     reached_goal = self._goal_attainment_classifier(*inputs)
     return reached_goal and self.is_term_true(state, info)
-  
-  def option_reward_function(self, r_ext: float, reached: bool, rmax: float = 1.):
-    """Option reward function assuming a normalized exploration bonus.
-
-    Args:
-      r_ext: extrinsic reward
-      reached: whether you reached the sampled goal in the termination set
-      rmax: reward for reaching the task goal
-    """
-    if self._option_idx > 1 and r_ext >= rmax:
-      # local options should not be rewarded for reaching the task goal
-      return r_ext - rmax + float(reached)  # (rext - rmax) is the bonus
-    elif self._option_idx > 1:
-      return r_ext + float(reached)
-    assert self._option_idx in (0, 1), self._option_idx
-    return r_ext
 
   def act(self, state, goal):
     augmented_state = self.get_augmeted_state(state, goal)
@@ -113,7 +97,15 @@ class Option:
         state, info = get_first_state_in_term_classifier(sampled_trajectory)
         if self.parent_initiation_learner.pessimistic_predict([state]):
           return state, info
-      print(f'{self} did not find a subgoal to sample.')
+      
+      # If we can't find something in the parent's pessimistic, use sth random
+      positive_examples = utils.flatten(
+        self.parent_initiation_learner.positive_examples
+      )
+
+      if len(positive_examples) > 0:
+        print(f'[{self}] Sampling from parent positives')
+        return random.choice(positive_examples)
 
   def rollout(self, env, state, info, goal, goal_info, init_replay):
     """Execute the option policy from `state` towards `goal`."""
@@ -163,25 +155,28 @@ class Option:
       self.update_option_initiation_classifiers(transitions, success)
 
   def update_option_policy(self, transitions, goal, goal_info):
+    # TODO(ab): do this during option execution to save computation
     self.experience_replay(transitions, goal, goal_info)
-    hindsight_goal, hindsight_goal_info = self.pick_hindsight_goal(
-      transitions, goal, goal_info)
-    self.experience_replay(transitions, hindsight_goal, hindsight_goal_info)
+    hindsight_goal, hindsight_goal_info = self.pick_hindsight_goal(transitions)
+
+    # If the first state in the trajectory doesn't achieve the hindsight goal
+    if not self._goal_attainment_classifier(transitions[0][-1], hindsight_goal_info):
+      self.experience_replay(transitions, hindsight_goal, hindsight_goal_info)
 
   def experience_replay(self, transitions, goal, goal_info):
     relabeled_trajectory = []
     for state, action, r_ext, next_state, info in transitions:
       sg = self.get_augmeted_state(state, goal)
       nsg = self.get_augmeted_state(next_state, goal)
-      reached = self.at_local_goal(next_state, info, goal, goal_info)
-      reward = self.option_reward_function(r_ext, reached)
+      reached = self._goal_attainment_classifier(info, goal_info)
+      reward = float(reached)
       relabeled_trajectory.append((
         sg, action, reward, nsg, reached, info['needs_reset']))
       if reached:
         break
     self._solver.experience_replay(relabeled_trajectory)
 
-  def pick_hindsight_goal(self, transitions, goal, goal_info, method='final'):
+  def pick_hindsight_goal(self, transitions, method='final'):
     if method == 'final':
       goal_transition = transitions[-1]
       goal = goal_transition[-2]
