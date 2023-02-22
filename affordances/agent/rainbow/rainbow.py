@@ -13,7 +13,8 @@ from pfrl.utils import batch_states as pfrl_batch_states
 class Rainbow:
   def __init__(self, n_actions, n_atoms, v_min, v_max, noisy_net_sigma, lr, 
          n_steps, betasteps, replay_start_size, replay_buffer_size, gpu,
-         n_obs_channels, use_custom_batch_states=True, epsilon=0.):
+         n_obs_channels, use_custom_batch_states=True,
+         epsilon_decay_steps=None, final_epsilon=0.1):
     self.n_actions = n_actions
     n_channels = n_obs_channels
     self.use_custom_batch_states = use_custom_batch_states
@@ -21,10 +22,22 @@ class Rainbow:
     self.q_func = DistributionalDuelingDQN(n_actions, n_atoms, v_min, v_max, n_input_channels=n_channels)
     pnn.to_factorized_noisy(self.q_func, sigma_scale=noisy_net_sigma)
 
-    explorer = explorers.ConstantEpsilonGreedy(
-      epsilon=epsilon,
-      random_action_func=lambda: random.randint(0, n_actions - 1)
-    )
+    if epsilon_decay_steps is None and final_epsilon is not None:
+      explorer = explorers.ConstantEpsilonGreedy(
+        epsilon=final_epsilon,
+        random_action_func=lambda: random.randint(0, n_actions - 1)
+      )
+    elif epsilon_decay_steps is not None and final_epsilon is not None:
+      print(f'Number of epsilon decay steps = {epsilon_decay_steps}')
+      explorer = explorers.LinearDecayEpsilonGreedy(
+        start_epsilon=1.0,
+        end_epsilon=final_epsilon,
+        decay_steps=epsilon_decay_steps,
+        random_action_func=lambda: random.randint(0, n_actions - 1)
+      )
+    else:
+      explorer = explorers.Greedy()
+    print(f'[Rainbow] Using exploration strategy {explorer}')
 
     opt = torch.optim.Adam(self.q_func.parameters(), lr, eps=1.5e-4)
 

@@ -21,7 +21,9 @@ class DSCAgent:
     gpu: int = 0,
     n_input_channels: int = 3,
     maintain_init_replay: bool = True,
-    max_n_options: int = 10
+    max_n_options: int = 10,
+    env_steps: int = int(500_000),
+    epsilon_decay_steps=25_000
   ):
 
     self._env = env
@@ -46,7 +48,11 @@ class DSCAgent:
     self._init_learner_type = init_learner_type
     assert init_learner_type in ('binary', 'td0', 'lstd-rp', 'neural-lstd', 'weighted-binary')
 
-    self.uvfa_policy = self.create_uvfa_policy(n_actions=env.action_space.n)
+    self.uvfa_policy = self.create_uvfa_policy(
+      n_actions=env.action_space.n,
+      env_steps=env_steps,
+      epsilon_decay_steps=epsilon_decay_steps
+    )
 
     self._init_replay_buffer = None
     if maintain_init_replay:
@@ -157,7 +163,7 @@ class DSCAgent:
       gestation_period=self._gestation_period, timeout=self._timeout // 2,
       start_state_classifier=self.start_state_classifier)
 
-  def create_uvfa_policy(self, n_actions, env_steps=50_000):
+  def create_uvfa_policy(self, n_actions, env_steps, epsilon_decay_steps):
     kwargs = dict(
       n_atoms=51, v_max=10., v_min=-10.,
       noisy_net_sigma=0.5, lr=6.25e-5, n_steps=3,
@@ -166,7 +172,8 @@ class DSCAgent:
       replay_buffer_size=int(3e5),
       gpu=self._gpu, n_obs_channels=2*self._n_input_channels,
       use_custom_batch_states=False,
-      epsilon=0.1
+      final_epsilon=0.1,
+      epsilon_decay_steps=epsilon_decay_steps
     )
     return Rainbow(n_actions, **kwargs)
 

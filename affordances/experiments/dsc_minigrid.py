@@ -18,7 +18,8 @@ def create_agent(env, s0, i0, goal_info):
     goal_attainment_classifier,
     args.gestation_period, args.timeout, args.init_learner_type,
     goal_info, args.gpu_id, n_input_channels=1,
-    maintain_init_replay=args.plot_initiation_function)
+    maintain_init_replay=args.plot_initiation_function,
+    epsilon_decay_steps=args.epsilon_decay_steps)
 
 
 def train(agent: DSCAgent, env, n_episodes):
@@ -70,7 +71,8 @@ if __name__ == '__main__':
   parser.add_argument('--checkpoint_frequency', type=int, default=100)
   parser.add_argument('--plotting_frequency', type=int, default=1)
   parser.add_argument('--log_dir', type=str, default='/gpfs/data/gdk/abagaria/affordances_logs')
-  parser.add_argument('--exploration_bonus_scale', default=1e-3, type=float)
+  parser.add_argument('--exploration_bonus_scale', default=0, type=float)
+  parser.add_argument('--epsilon_decay_steps', type=int, default=25_000)
   args = parser.parse_args()
 
   g_log_dir = os.path.join(args.log_dir, args.experiment_name, args.sub_dir)
