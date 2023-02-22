@@ -105,10 +105,10 @@ class DSCAgent:
       self.new_options.remove(option)
       self.mature_options.append(option)
 
-    if option.training_phase != 'gestation' and not option._is_global_option \
-      and option.should_expand_initiation(self.start_state, self.start_state_info):
-      print(f'Expanding the skill chain to fix {option} to s0')
-      option.is_last_option = True
+      if option.training_phase != 'gestation' and not option._is_global_option \
+        and option.should_expand_initiation(self.start_state, self.start_state_info):
+        print(f'Expanding the skill chain to fix {option} to s0')
+        option.is_last_option = True
     
     if self.should_create_new_option():
       new_option = self.create_new_option()
