@@ -1,4 +1,5 @@
 import math
+import pickle
 import numpy as np
 from PIL import Image
 import gymnasium as gym
@@ -84,7 +85,37 @@ class ScaledStateBonus(StateBonus):
     bonus = 1 / math.sqrt(new_count)
     reward += (self.reward_scale * bonus)
 
+    # Add to the info dict
+    info['count'] = new_count
+    info['bonus'] = bonus
+
     return obs, reward, terminated, truncated, info
+  
+
+class RandomStartWrapper(Wrapper):
+  def __init__(self, env, start_loc_file='start_locations_4rooms.pkl'):
+    """Randomly samples the starting location for the agent. We have to use the
+    ReseedWrapper() because otherwiswe the layout can change between episodes.
+    But when we use that wrapper, it also makes random init selection impossible.
+    As a hack, I stored some randomly generated (non-collision) locations to a
+    file and that is the one we load here.
+    """
+    super().__init__(env)
+    self.n_episodes = 0
+    self.start_locations = pickle.load(open(start_loc_file, 'rb'))
+
+  def reset(self):
+    obs, info = super().reset()
+    rand_pos = self.start_locations[self.n_episodes % len(self.start_locations)]
+    new_pos = self.env.place_agent(
+      top=rand_pos,
+      size=(3, 3)
+    )
+    info['player_x'] = new_pos[0]
+    info['player_y'] = new_pos[1]
+    info['player_pos'] = new_pos
+    self.n_episodes += 1
+    return obs, info
 
 
 def determine_goal_pos(env):
@@ -102,10 +133,11 @@ def environment_builder(
   reward_fn='sparse',
   grayscale=True,
   add_count_based_bonus=True,
-  exploration_reward_scale=1e-3,
-  seed=42
+  exploration_reward_scale=0,
+  seed=42,
+  random_reset=False,
 ):
-  env = gym.make(level_name)
+  env = gym.make(level_name)  #, goal_pos=(11, 11))
   env = ReseedWrapper(env, seeds=[seed])  # To fix the start-goal config
   env = RGBImgObsWrapper(env) # Get pixel observations
   env = ImgObsWrapper(env) # Get rid of the 'mission' field
@@ -118,4 +150,7 @@ def environment_builder(
   if add_count_based_bonus:
     env = ScaledStateBonus(env, exploration_reward_scale)
   env = MinigridInfoWrapper(env)
+  if random_reset:
+    assert exploration_reward_scale == 0, exploration_reward_scale
+    env = RandomStartWrapper(env)
   return env
