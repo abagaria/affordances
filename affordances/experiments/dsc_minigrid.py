@@ -49,7 +49,7 @@ def log(agent: DSCAgent, returns_so_far: list, episode: int):
 
   if args.checkpoint_init_learners and episode % args.checkpoint_frequency == 0:
     for option in agent.mature_options:
-      filename = f'{g_log_dir}/option_{option.option_idx}_init_{episode}.pth'
+      filename = f'{g_log_dir}/option_{option._option_idx}_init_{episode}.pth'
       option.initiation_learner.save(filename)
     agent._init_replay_buffer.save(f'{g_log_dir}/init_replay_{episode}.pkl')
 
@@ -87,6 +87,7 @@ if __name__ == '__main__':
     exploration_reward_scale=args.exploration_bonus_scale)
   start_state, start_info = environment.reset()
   goal_info_dict = dict(player_pos=determine_goal_pos(environment))
+  print(environment)
   dsc_agent = create_agent(environment, start_state, start_info, goal_info_dict)
 
   episodic_returns = train(dsc_agent, environment, args.n_episodes)
