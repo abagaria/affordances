@@ -19,7 +19,8 @@ def create_agent(env, s0, i0, goal_info):
     args.gestation_period, args.timeout, args.init_learner_type,
     goal_info, args.gpu_id, n_input_channels=1,
     maintain_init_replay=args.plot_initiation_function,
-    epsilon_decay_steps=args.epsilon_decay_steps)
+    epsilon_decay_steps=args.epsilon_decay_steps,
+    exploration_bonus_scale=args.exploration_bonus_scale)
 
 
 def train(agent: DSCAgent, env, n_episodes):
@@ -86,7 +87,7 @@ if __name__ == '__main__':
 
   environment = environment_builder(
     level_name=args.environment_name, seed=args.seed,
-    exploration_reward_scale=args.exploration_bonus_scale)
+    exploration_reward_scale=0)
   start_state, start_info = environment.reset()
   goal_info_dict = dict(player_pos=determine_goal_pos(environment))
   print(environment)

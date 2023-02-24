@@ -24,7 +24,7 @@ def create_agent(
       replay_buffer_size=int(3e5),
       gpu=gpu, n_obs_channels=2*n_input_channels,
       use_custom_batch_states=False,
-      epsilon=0.1
+      epsilon_decay_steps=args.epsilon_decay_steps
     )
     return Rainbow(n_actions, **kwargs)
 
@@ -59,7 +59,7 @@ def experience_replay(agent: Rainbow, transitions, goal, goal_info):
     sg = concat(state, goal)
     nsg = concat(next_state, goal)
     reached = info['player_pos'] == goal_info['player_pos']
-    reward = float(reached)
+    reward = float(reached) + (args.exploration_bonus_scale * info['bonus'])
     relabeled_trajectory.append((
       sg, action, reward, nsg, reached, info['needs_reset']))
     if reached:
@@ -91,12 +91,15 @@ def pick_hindsight_goal(transitions, method='final'):
 
 def train(agent: Rainbow, env, n_episodes,
           task_goal: np.ndarray, task_goal_info: dict):
+  rewards = []
   for _ in range(n_episodes):
     goal, goal_info = select_goal(task_goal, task_goal_info)
     trajectory = rollout(agent, env, goal)
     experience_replay(agent, trajectory, goal, goal_info)
     hindsight_goal, hindsight_goal_info = pick_hindsight_goal(trajectory)
     experience_replay(agent, trajectory, hindsight_goal, hindsight_goal_info)
+    rewards.append(sum([transition[2] for transition in trajectory]))
+  return np.mean(rewards)
 
 
 def evaluate(agent: Rainbow, env, task_goal: np.ndarray, n_episodes: int = 10):
@@ -118,6 +121,14 @@ def log(msr):
 def run(agent: Rainbow, env, n_iterations,
         task_goal: np.ndarray, task_goal_info: dict):
   for iter in range(n_iterations):
+    msr = train(agent, env, 10, task_goal, task_goal_info)
+    print(f'[TrainIter={iter}] Mean Success Rate: {msr}')
+    log(msr)
+
+
+def run_with_eval(agent: Rainbow, env, n_iterations,
+        task_goal: np.ndarray, task_goal_info: dict):
+  for iter in range(n_iterations):
     train(agent, env, 10, task_goal, task_goal_info)
     msr = evaluate(agent, env, task_goal, n_episodes=10)
     print(f'[EvaluationIter={iter}] Mean Success Rate: {msr}')
@@ -134,8 +145,9 @@ if __name__ == '__main__':
   parser.add_argument('--n_iterations', type=int, default=1000)
   parser.add_argument('--lr', type=float, default=6.25e-5)
   parser.add_argument('--sigma', type=float, default=0.5)
-  parser.add_argument('--bonus_scale', type=float, default=0)
+  parser.add_argument('--exploration_bonus_scale', type=float, default=0)
   parser.add_argument('--log_dir', type=str, default='/gpfs/data/gdk/abagaria/affordances_logs')
+  parser.add_argument('--epsilon_decay_steps', type=int, default=25_000)
   args = parser.parse_args()
 
   g_log_dir = os.path.join(args.log_dir, args.experiment_name, args.sub_dir)
@@ -148,7 +160,7 @@ if __name__ == '__main__':
   utils.set_random_seed(args.seed)
 
   environment = environment_builder(
-    args.environment_name, exploration_reward_scale=args.bonus_scale)
+    args.environment_name, exploration_reward_scale=0)
 
   rainbow_agent = create_agent(
     environment.action_space.n,

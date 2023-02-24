@@ -18,12 +18,14 @@ class Option:
     goal_attainment_classifier: GoalAttainmentClassifier,
     gestation_period: int,
     timeout: int,
-    start_state_classifier):
+    start_state_classifier,
+    exploration_bonus_scale: float):
       self._timeout = timeout
       self._solver = uvfa_policy
       self._option_idx = option_idx
       self._gestation_period = gestation_period
       self._goal_attainment_classifier = goal_attainment_classifier
+      self._exploration_bonus_scale = exploration_bonus_scale
       
       self.initiation_learner = initiation_learner
       self.parent_initiation_learner = parent_initiation_learner
@@ -40,6 +42,8 @@ class Option:
       self.num_executions = 0
       self.effect_set = collections.deque(maxlen=20)
       self.success_curve = collections.deque(maxlen=100)
+
+      print(f'Created {self} with bonus_scale={exploration_bonus_scale}')
 
   @property
   def training_phase(self):
@@ -169,7 +173,7 @@ class Option:
       sg = self.get_augmeted_state(state, goal)
       nsg = self.get_augmeted_state(next_state, goal)
       reached = self._goal_attainment_classifier(info, goal_info)
-      reward = float(reached)
+      reward = float(reached) + (self._exploration_bonus_scale * info['bonus'])
       relabeled_trajectory.append((
         sg, action, reward, nsg, reached, info['needs_reset']))
       if reached:

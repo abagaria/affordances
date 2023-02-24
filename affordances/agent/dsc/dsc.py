@@ -23,7 +23,8 @@ class DSCAgent:
     maintain_init_replay: bool = True,
     max_n_options: int = 10,
     env_steps: int = int(500_000),
-    epsilon_decay_steps=25_000
+    epsilon_decay_steps: int = 25_000,
+    exploration_bonus_scale: float = 0,
   ):
 
     self._env = env
@@ -33,6 +34,7 @@ class DSCAgent:
     self._goal_info_dict = goal_info_dict
     self._maintain_init_replay = maintain_init_replay
     self._max_n_options = max_n_options
+    self._exploration_bonus_scale = exploration_bonus_scale
     
     self._gpu = gpu
     self._device = f'cuda:{gpu}' if gpu > -1 else 'cpu'
@@ -153,7 +155,8 @@ class DSCAgent:
       parent_initiation_learner=termination_classifier,
       goal_attainment_classifier=self.goal_attainment_classifier,
       gestation_period=self._gestation_period, timeout=self._timeout,
-      start_state_classifier=self.start_state_classifier)
+      start_state_classifier=self.start_state_classifier,
+      exploration_bonus_scale=self._exploration_bonus_scale)
 
   def create_global_option(self):
     return Option(option_idx=0, uvfa_policy=self.uvfa_policy,
@@ -161,7 +164,8 @@ class DSCAgent:
       parent_initiation_learner=self.task_goal_classifier,
       goal_attainment_classifier=self.goal_attainment_classifier,
       gestation_period=self._gestation_period, timeout=self._timeout // 2,
-      start_state_classifier=self.start_state_classifier)
+      start_state_classifier=self.start_state_classifier,
+      exploration_bonus_scale=self._exploration_bonus_scale)
 
   def create_uvfa_policy(self, n_actions, env_steps, epsilon_decay_steps):
     kwargs = dict(
