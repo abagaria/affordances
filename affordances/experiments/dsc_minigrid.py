@@ -1,3 +1,7 @@
+'''
+python -m affordances.experiments.dsc_minigrid --experiment_name test --sub_dir test_subdir
+'''
+
 import os
 import argparse
 
@@ -71,7 +75,7 @@ if __name__ == '__main__':
   parser.add_argument('--checkpoint_init_learners', action='store_true', default=False)
   parser.add_argument('--checkpoint_frequency', type=int, default=100)
   parser.add_argument('--plotting_frequency', type=int, default=1)
-  parser.add_argument('--log_dir', type=str, default='/gpfs/data/gdk/abagaria/affordances_logs')
+  parser.add_argument('--log_dir', type=str, default='./affordances_logs')
   parser.add_argument('--exploration_bonus_scale', default=0, type=float)
   parser.add_argument('--epsilon_decay_steps', type=int, default=25_000)
   args = parser.parse_args()

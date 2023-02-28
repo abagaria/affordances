@@ -46,10 +46,14 @@ class ConvClassifier:
 
   @torch.no_grad()
   def predict(self, X, threshold=None):
+    threshold = self.threshold if threshold is None else threshold
+    return self.predict_proba(X) > threshold
+  
+  @torch.no_grad()
+  def predict_proba(self, X):
     logits = self.model(X)
     probabilities = torch.sigmoid(logits)
-    threshold = self.threshold if threshold is None else threshold
-    return probabilities > threshold
+    return probabilities
 
   def determine_pos_weight(self, y):
     n_negatives = len(y[y != 1])

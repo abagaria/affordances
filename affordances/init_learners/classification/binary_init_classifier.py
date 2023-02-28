@@ -20,9 +20,9 @@ class ConvInitiationClassifier(InitiationClassifier):
     self.optimistic_threshold = optimistic_threshold
     self.pessimistic_threshold = pessimistic_threshold
     self.n_input_channels = n_input_channels
-    
     self.classifier = ConvClassifier(device, None, n_input_channels)
-    
+    self.option = None # reference to option that owns this classifier. 
+
     super().__init__(max_n_trajectories=maxlen)
 
   def _predict(self, states: np.ndarray, threshold) -> np.ndarray:
@@ -34,10 +34,23 @@ class ConvInitiationClassifier(InitiationClassifier):
       return predictions.squeeze()
     return predictions
 
-  def optimistic_predict(self, states: np.ndarray) -> np.ndarray:
-    return self._predict(states, self.optimistic_threshold)
+  def optimistic_predict(self, states: np.ndarray, infos: np.ndarray) -> np.ndarray:
+    state_tensor = utils.tensorfy(states, self.device)
+    preprocessed_tensor = state_tensor / 255.
+    predictions = self.classifier.predict_proba(preprocessed_tensor)
+    
+    assert (self.option != None) 
+    assert (len(states) == len(infos))
+    assert (len(list(self.option.visitation_counts.keys())) > 0)
 
-  def pessimistic_predict(self, states: np.ndarray) -> np.ndarray:
+    ucb_predictions = []
+    for _, (pred, i) in enumerate(zip(predictions, infos)): 
+      N = max(self.option.visitation_counts.get(i['player_pos'], 0), 1)
+      ucb_predictions.append(pred.cpu().numpy() + 1/np.sqrt(N))
+    ucb_predictions = np.array(ucb_predictions) 
+    return ucb_predictions > self.optimistic_threshold
+
+  def pessimistic_predict(self, states: np.ndarray, infos:np.ndarray) -> np.ndarray:
     return self._predict(states, self.pessimistic_threshold)
 
   def add_trajectory(self, trajectory, success_label):
@@ -64,7 +77,6 @@ class ConvInitiationClassifier(InitiationClassifier):
 
       X = pos_observations + neg_observations
       Y = torch.cat((positive_labels, negative_labels), dim=0)
-
       if self.classifier.should_train(Y):
         self.classifier.fit(X, Y)
 

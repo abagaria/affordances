@@ -150,13 +150,16 @@ class DSCAgent:
     else:
       termination_classifier = self.task_goal_classifier
 
-    return Option(option_idx=option_idx, uvfa_policy=self.uvfa_policy,
-      initiation_learner=self.create_init_classifier(),
+    classifier = self.create_init_classifier() 
+    option =  Option(option_idx=option_idx, uvfa_policy=self.uvfa_policy,
+      initiation_learner=classifier,
       parent_initiation_learner=termination_classifier,
       goal_attainment_classifier=self.goal_attainment_classifier,
       gestation_period=self._gestation_period, timeout=self._timeout,
       start_state_classifier=self.start_state_classifier,
       exploration_bonus_scale=self._exploration_bonus_scale)
+    classifier.option = option 
+    return option 
 
   def create_global_option(self):
     return Option(option_idx=0, uvfa_policy=self.uvfa_policy,

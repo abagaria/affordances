@@ -43,6 +43,10 @@ class Option:
       self.effect_set = collections.deque(maxlen=20)
       self.success_curve = collections.deque(maxlen=100)
 
+      self.visitation_counts = {} 
+      # map from (agent_x, agent_y) --> num times in state. 
+      # defaults to 1. 
+
       print(f'Created {self} with bonus_scale={exploration_bonus_scale}')
 
   @property
@@ -56,19 +60,19 @@ class Option:
     if self.is_last_option and self._start_state_classifier(info):
       return True
 
-    decision1 = self.initiation_learner.optimistic_predict([state]) 
-    decision2 = self.initiation_learner.pessimistic_predict([state])
+    decision1 = self.initiation_learner.optimistic_predict([state], [info]) 
+    decision2 = self.initiation_learner.pessimistic_predict([state], [info])
     return decision1 or decision2
 
   def pessimistic_is_init_true(self, state, info):
-    return self.initiation_learner.pessimistic_predict([state])
+    return self.initiation_learner.pessimistic_predict([state], [info])
 
   def is_term_true(self, state, info):
     if self._option_idx <= 1:
       return self.parent_initiation_learner(info)
     
     # TODO(ab): maybe task goal should be in every option's termination set
-    return self.parent_initiation_learner.pessimistic_predict([state])
+    return self.parent_initiation_learner.pessimistic_predict([state], [info])
 
   def at_local_goal(self, state, info, goal, goal_info):
     inputs = (state, goal) if self._goal_attainment_classifier.use_obs else (info, goal_info)
@@ -87,7 +91,7 @@ class Option:
       observations = [eg[0] for eg in examples]
       infos = [eg[1] for eg in examples]
       predictions = self.parent_initiation_learner.pessimistic_predict(
-        observations)
+        observations, infos)
       sampled_idx = predictions.argmax()  # argmax returns the index of 1st max
       return observations[sampled_idx], infos[sampled_idx]
 
@@ -99,7 +103,7 @@ class Option:
         trajectory_idx = random.choice(range(len(trjaectories)))
         sampled_trajectory = trjaectories[trajectory_idx]
         state, info = get_first_state_in_term_classifier(sampled_trajectory)
-        if self.parent_initiation_learner.pessimistic_predict([state]):
+        if self.parent_initiation_learner.pessimistic_predict([state], [info]):
           return state, info
       
       # If we can't find something in the parent's pessimistic, use sth random
@@ -123,6 +127,12 @@ class Option:
     trajectory = []  # (s, a, r, s', info)
 
     while not done and not reset and not reached and n_steps < self._timeout:
+
+      if not info['player_pos'] in self.visitation_counts: 
+        self.visitation_counts[info['player_pos']] = 1
+      else: 
+        self.visitation_counts[info['player_pos']] += 1
+
       action = self.act(state, goal)
       
       next_state, reward, done, info = env.step(action)
