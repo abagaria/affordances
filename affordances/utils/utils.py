@@ -85,3 +85,8 @@ def set_random_seed(seed):
   random.seed(seed)
   np.random.seed(seed)
   torch.manual_seed(seed)
+
+
+def concat(state, goal):
+  assert state.shape == (1, 84, 84), state.shape
+  return np.concatenate((state, goal), axis=0)

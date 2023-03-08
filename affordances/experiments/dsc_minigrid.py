@@ -1,4 +1,5 @@
 import os
+import random
 import argparse
 
 from affordances.utils import utils
@@ -20,7 +21,9 @@ def create_agent(env, s0, i0, goal_info):
     goal_info, args.gpu_id, n_input_channels=1,
     maintain_init_replay=args.plot_initiation_function,
     epsilon_decay_steps=args.epsilon_decay_steps,
-    exploration_bonus_scale=args.exploration_bonus_scale)
+    exploration_bonus_scale=args.exploration_bonus_scale,
+    use_her_for_policy_evaluation=args.use_her_for_policy_evaluation
+  )
 
 
 def train(agent: DSCAgent, env, n_episodes):
@@ -30,10 +33,12 @@ def train(agent: DSCAgent, env, n_episodes):
     state, info, episode_rewards = agent.dsc_rollout(obs0, info0)
     undiscounted_return = sum(episode_rewards)
     rewards.append(undiscounted_return)
+    print(80 * '-')
     print(f'Episode: {episode}',
       f"InitPos': {info0['player_pos']}",
       f"FinalPos: {info['player_pos']}",
       f'Reward: {undiscounted_return}')
+    print(80 * '-')
     log(agent, rewards, episode)
   return rewards
 
@@ -53,7 +58,17 @@ def log(agent: DSCAgent, returns_so_far: list, episode: int):
     for option in agent.mature_options:
       filename = f'{g_log_dir}/option_{option._option_idx}_init_{episode}.pth'
       option.initiation_learner.save(filename)
-    agent._init_replay_buffer.save(f'{g_log_dir}/init_replay_{episode}.pkl')
+      break
+    
+    if agent._init_replay_buffer is not None:
+      agent._init_replay_buffer.save(f'{g_log_dir}/init_replay_{episode}.pkl')
+
+  # for option in agent.mature_options:
+  #   goal, goal_info = random.choice(option.get_potential_goals())
+  #   plotting_utils.visualize_gc_initiation_learner(
+  #     agent.initiation_learner, agent.initiation_learner.initiation_replay_buffer,
+  #     goal, goal_info, episode, 'plots', args.experiment_name, args.seed
+  #   )
 
 
 if __name__ == '__main__':
@@ -74,6 +89,8 @@ if __name__ == '__main__':
   parser.add_argument('--log_dir', type=str, default='/gpfs/data/gdk/abagaria/affordances_logs')
   parser.add_argument('--exploration_bonus_scale', default=0, type=float)
   parser.add_argument('--epsilon_decay_steps', type=int, default=25_000)
+  parser.add_argument('--use_random_resets', action='store_true', default=False)
+  parser.add_argument('--use_her_for_policy_evaluation', action='store_true', default=False)
   args = parser.parse_args()
 
   g_log_dir = os.path.join(args.log_dir, args.experiment_name, args.sub_dir)
@@ -87,7 +104,10 @@ if __name__ == '__main__':
 
   environment = environment_builder(
     level_name=args.environment_name, seed=args.seed,
-    exploration_reward_scale=0)
+    exploration_reward_scale=0,
+    random_reset=args.use_random_resets
+  )
+  
   start_state, start_info = environment.reset()
   goal_info_dict = dict(player_pos=determine_goal_pos(environment))
   print(environment)

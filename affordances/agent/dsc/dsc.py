@@ -1,9 +1,13 @@
 import random
+import collections
 import numpy as np
 from pfrl.replay_buffers import ReplayBuffer
+
+from affordances.utils import utils
 from affordances.agent.dsc.option import Option
 from affordances.agent.rainbow.rainbow import Rainbow
 from affordances.init_learners.classification.binary_init_classifier import ConvInitiationClassifier
+from affordances.init_learners.gvf.init_gvf import GoalConditionedInitiationGVF
 
 
 class DSCAgent:
@@ -25,6 +29,7 @@ class DSCAgent:
     env_steps: int = int(500_000),
     epsilon_decay_steps: int = 25_000,
     exploration_bonus_scale: float = 0,
+    use_her_for_policy_evaluation: bool = False
   ):
 
     self._env = env
@@ -35,6 +40,7 @@ class DSCAgent:
     self._maintain_init_replay = maintain_init_replay
     self._max_n_options = max_n_options
     self._exploration_bonus_scale = exploration_bonus_scale
+    self._use_her_for_policy_evaluation = use_her_for_policy_evaluation
     
     self._gpu = gpu
     self._device = f'cuda:{gpu}' if gpu > -1 else 'cpu'
@@ -55,6 +61,8 @@ class DSCAgent:
       env_steps=env_steps,
       epsilon_decay_steps=epsilon_decay_steps
     )
+
+    self.initiation_learner = self.create_initiation_learner()
 
     self._init_replay_buffer = None
     if maintain_init_replay:
@@ -81,20 +89,35 @@ class DSCAgent:
     done = False
     reset = False
     rewards = []
+    episode_length = 0
 
     while not done and not reset:
       option = self.select_option(state, info)
-      subgoal = option.sample_goal(state)
+      subgoal = option.sample_goal(state, info)
       
       if subgoal is None:
         subgoal = self.get_subgoal_for_global_option(state)
 
-      state, info, reward, done, reset, reached = option.rollout(
+      state, info, reward, done, reset, reached, n_steps = option.rollout(
         self._env, state, info, *subgoal, init_replay=self._init_replay_buffer)
       self.manage_chain_after_rollout(option)
 
       rewards.append(reward)
-      print(f"{option} Goal: {subgoal[1]['player_pos']} Reached: {info['player_pos']}")
+      episode_length += n_steps
+
+      print(f"{option} Goal: {subgoal[1]['player_pos']}",
+            f"Reached: {info['player_pos']} Success: {reached}")
+      
+    self.update_initiation_samples()
+    self.update_initiation_learner(episode_length)
+    
+    discounted_return = (self.uvfa_policy.agent.gamma ** (episode_length - 1)) * sum(rewards)
+    estimated_value = self.initiation_learner.get_values(
+      [self.start_state],
+      [self.get_subgoal_for_global_option(self.start_state)[0]]
+    )
+    print(f"Discounted return: {discounted_return}",
+          f"Estimated value: {estimated_value}")
 
     return state, info, rewards
 
@@ -123,6 +146,42 @@ class DSCAgent:
       self.chain.append(new_option)
       self.new_options.append(new_option)
 
+  def update_initiation_samples(self):
+    """Update parent positives for all options in the chain."""
+    for i, o in enumerate(self.mature_options):
+      assert isinstance(o, Option)
+      
+      if o._option_idx > 1:
+        parent_pos = self.mature_options[i - 1].pessimistic_initiation_samples
+      else:
+        parent_pos = o.effect_set
+
+      states = utils.flatten(o.positive_examples)
+      observations = [state[0] for state in states]
+      goals = [eg[0] for eg in parent_pos]
+      values = [o.initiation_learner.get_values(
+        np.repeat(obs[np.newaxis, ...], len(goals), axis=0),
+        np.asarray(goals)
+      ).max() for obs in observations]
+      thresh = o.initiation_learner.pessimistic_threshold
+      positives = [states[i] for i in range(len(states)) if values[i] > thresh]
+      
+      if positives:
+        o.pessimistic_initiation_samples = positives
+      else:
+        o.pessimistic_initiation_samples = [states[np.argmax(values)]]
+
+      if i + 1 < len(self.chain):
+        child = self.chain[i+1]
+        print(f'Setting {child}s goals to be {o}s pessimistic samples')
+        self.chain[i+1].parent_positive_examples = o.pessimistic_initiation_samples
+  
+  def update_initiation_learner(self, episode_duration):
+    if len(self.goal_option.positive_examples) > 0:
+      self.initiation_learner.update(
+        n_updates=(episode_duration // self.uvfa_policy.update_interval)
+      )
+
   def should_create_new_option(self):
     """Create a new option if the following conditions are satisfied:
       - we are not currently learning any option (they are all mature),
@@ -146,40 +205,47 @@ class DSCAgent:
     
     if option_idx > 1:
       parent_option = self.chain[-1]
-      termination_classifier = parent_option.initiation_learner
+      assert isinstance(parent_option, Option)
+      termination_classifier = parent_option.pessimistic_is_init_true
+      parent_positive_examples = parent_option.pessimistic_initiation_samples
     else:
       termination_classifier = self.task_goal_classifier
+      parent_positive_examples = collections.deque([])
 
     return Option(option_idx=option_idx, uvfa_policy=self.uvfa_policy,
-      initiation_learner=self.create_init_classifier(),
-      parent_initiation_learner=termination_classifier,
+      initiation_learner=self.initiation_learner,
+      termination_classifier=termination_classifier,
       goal_attainment_classifier=self.goal_attainment_classifier,
       gestation_period=self._gestation_period, timeout=self._timeout,
       start_state_classifier=self.start_state_classifier,
-      exploration_bonus_scale=self._exploration_bonus_scale)
+      exploration_bonus_scale=self._exploration_bonus_scale,
+      parent_positive_examples=parent_positive_examples,
+      use_her_for_policy_evaluation=self._use_her_for_policy_evaluation)
 
   def create_global_option(self):
     return Option(option_idx=0, uvfa_policy=self.uvfa_policy,
-      initiation_learner=None,
-      parent_initiation_learner=self.task_goal_classifier,
+      initiation_learner=self.initiation_learner,
+      termination_classifier=self.task_goal_classifier,
       goal_attainment_classifier=self.goal_attainment_classifier,
       gestation_period=self._gestation_period, timeout=self._timeout // 2,
       start_state_classifier=self.start_state_classifier,
-      exploration_bonus_scale=self._exploration_bonus_scale)
+      exploration_bonus_scale=self._exploration_bonus_scale,
+      parent_positive_examples=collections.deque([]),
+      use_her_for_policy_evaluation=self._use_her_for_policy_evaluation)
 
   def create_uvfa_policy(self, n_actions, env_steps, epsilon_decay_steps):
     kwargs = dict(
       n_atoms=51, v_max=10., v_min=-10.,
       noisy_net_sigma=0.5, lr=6.25e-5, n_steps=3,
       betasteps=env_steps // 4,
-      replay_start_size=1024, 
-      replay_buffer_size=int(3e5),
+      replay_start_size=10_000, 
+      replay_buffer_size=int(5e5),
       gpu=self._gpu, n_obs_channels=2*self._n_input_channels,
       use_custom_batch_states=False,
       final_epsilon=0.1,
       epsilon_decay_steps=epsilon_decay_steps
     )
-    return Rainbow(n_actions, **kwargs)
+    return Rainbow(3, **kwargs)
 
   def create_init_classifier(self):
     if self._init_learner_type == 'binary':
@@ -188,3 +254,13 @@ class DSCAgent:
         pessimistic_threshold=0.75,
         n_input_channels=self._n_input_channels)
     raise NotImplementedError(self._init_learner_type)
+  
+  def create_initiation_learner(self):
+    """Common goal-conditioned initiation learner shared by all options."""
+    if self._init_learner_type == 'td0':
+      return GoalConditionedInitiationGVF(
+        target_policy=self.uvfa_policy.agent.batch_act,
+        n_actions=self._env.action_space.n,
+        n_input_channels=2*self._n_input_channels,
+      )
+    raise NotImplementedError()
