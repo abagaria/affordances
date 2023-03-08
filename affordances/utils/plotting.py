@@ -3,24 +3,26 @@ import collections
 import numpy as np
 import matplotlib.pyplot as plt
 from pfrl.replay_buffers.prioritized import PrioritizedReplayBuffer
-
+import os 
 
 def parse_replay(replay):
   states = []
   x_locations = []
   y_locations = []
+  infos = [] 
   memory = replay.memory.data if isinstance(replay, PrioritizedReplayBuffer) else replay.memory
   for transition in memory:
     transition = transition[-1]  # n-step to single transition
     states.append(transition['next_state'])
     x_locations.append(transition['extra_info']['player_x'])
     y_locations.append(transition['extra_info']['player_y'])
-  return states, x_locations, y_locations
+    infos.append(transition['extra_info'])
+  return states, x_locations, y_locations, infos
 
 
 def visualize_value_func(agent, params, replay, episode, experiment_name, seed):
   # Each state has shape (3, 84, 84)
-  states, x_positions, y_positions = parse_replay(replay)
+  states, x_positions, y_positions, infos = parse_replay(replay)
 
   values = []
   chunk_size = min(len(states), 10_000)
@@ -58,7 +60,7 @@ def visualize_value_func(agent, params, replay, episode, experiment_name, seed):
 
 
 def visualize_initiation_set(option, replay, episode, experiment_name, seed):
-  states, x_positions, y_positions = parse_replay(replay)
+  states, x_positions, y_positions, infos = parse_replay(replay)
 
   values = []
   optimistic_values = []
@@ -69,13 +71,14 @@ def visualize_initiation_set(option, replay, episode, experiment_name, seed):
   state_chunks = np.array_split(states, num_chunks)
   x_chunks = np.array_split(x_positions, num_chunks)
   y_chunks = np.array_split(y_positions, num_chunks)
+  info_chunks = np.array_split(np.array(infos), num_chunks)
 
   value_dict = collections.defaultdict(list)
   optimistic_value_dict = collections.defaultdict(list)
 
-  for state_chunk, x_chunk, y_chunk in zip(state_chunks, x_chunks, y_chunks):
-    value_chunk = option.initiation_learner.pessimistic_predict(state_chunk)
-    opt_value_chunk = option.initiation_learner.optimistic_predict(state_chunk)
+  for state_chunk, x_chunk, y_chunk, info_chunk in zip(state_chunks, x_chunks, y_chunks, info_chunks):
+    value_chunk = option.initiation_learner.pessimistic_predict(state_chunk, info_chunk)
+    opt_value_chunk = option.initiation_learner.optimistic_predict(state_chunk, info_chunk)
     value_list = value_chunk.tolist()
     opt_value_list = opt_value_chunk.tolist()
 
@@ -106,6 +109,18 @@ def visualize_initiation_set(option, replay, episode, experiment_name, seed):
   plt.colorbar()
   plt.title(f'Max Optimistic Init for {option}')
 
-  plt.savefig(f'plots/{experiment_name}/{seed}/{option}_init_{episode}.png')
+  try: 
+    os.mkdir("./plots")
+  except OSError as error:
+    pass 
+
+
+  try: 
+    os.mkdir(f"./plots/{experiment_name}")
+  except OSError as error:
+    pass 
+
+  plt.savefig(f"./plots/{experiment_name}/{option}_init_{episode}.png")
   plt.close()
+
   # return x, y, pv, ov

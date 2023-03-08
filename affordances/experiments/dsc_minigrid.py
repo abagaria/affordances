@@ -10,7 +10,7 @@ from affordances.agent.dsc.dsc import DSCAgent
 from affordances.utils import plotting as plotting_utils
 from affordances.domains.minigrid import environment_builder, determine_goal_pos
 from affordances.goal_attainment.attainment_classifier import DiscreteInfoAttainmentClassifier
-
+from affordances.utils.plotting import visualize_initiation_set
 
 def create_agent(env, s0, i0, goal_info):
   goal_attainment_classifier = DiscreteInfoAttainmentClassifier(
@@ -56,8 +56,9 @@ def log(agent: DSCAgent, returns_so_far: list, episode: int):
   if args.checkpoint_init_learners and episode % args.checkpoint_frequency == 0:
     for option in agent.mature_options:
       filename = f'{g_log_dir}/option_{option._option_idx}_init_{episode}.pth'
-      option.initiation_learner.save(filename)
-    agent._init_replay_buffer.save(f'{g_log_dir}/init_replay_{episode}.pkl')
+      # option.initiation_learner.save(filename)
+      visualize_initiation_set(option, agent._init_replay_buffer, episode, experiment_name="test", seed=0)      
+      # agent._init_replay_buffer.save(f'{g_log_dir}/init_replay_{episode}.pkl')
 
 
 if __name__ == '__main__':
@@ -71,8 +72,8 @@ if __name__ == '__main__':
   parser.add_argument('--init_learner_type', type=str, default='binary')
   parser.add_argument('--gpu_id', type=int, default=0)
   parser.add_argument('--n_episodes', type=int, default=5000)
-  parser.add_argument('--plot_initiation_function', action='store_true', default=False)
-  parser.add_argument('--checkpoint_init_learners', action='store_true', default=False)
+  parser.add_argument('--plot_initiation_function', action='store_true', default=True)
+  parser.add_argument('--checkpoint_init_learners', action='store_true', default=True)
   parser.add_argument('--checkpoint_frequency', type=int, default=100)
   parser.add_argument('--plotting_frequency', type=int, default=1)
   parser.add_argument('--log_dir', type=str, default='./affordances_logs')
