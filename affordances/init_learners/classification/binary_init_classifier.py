@@ -34,7 +34,7 @@ class ConvInitiationClassifier(InitiationClassifier):
       return predictions.squeeze()
     return predictions
 
-  def optimistic_predict(self, states: np.ndarray, infos: np.ndarray) -> np.ndarray:
+  def optimistic_predict(self, states: np.ndarray, infos: np.ndarray, use_ucb:bool) -> np.ndarray:
     state_tensor = utils.tensorfy(states, self.device)
     preprocessed_tensor = state_tensor / 255.
     predictions = self.classifier.predict_proba(preprocessed_tensor)
@@ -43,10 +43,12 @@ class ConvInitiationClassifier(InitiationClassifier):
     assert (len(states) == len(infos))
     assert (len(list(self.option.visitation_counts.keys())) > 0)
 
+    use_ucb = int(use_ucb)
+
     ucb_predictions = []
     for _, (pred, i) in enumerate(zip(predictions, infos)): 
       N = max(self.option.visitation_counts.get(i['player_pos'], 0), 1)
-      ucb_predictions.append(pred.cpu().numpy() + 1/np.sqrt(N))
+      ucb_predictions.append(pred.cpu().numpy() + use_ucb/np.sqrt(N))
     ucb_predictions = np.array(ucb_predictions) 
     return ucb_predictions > self.optimistic_threshold
 

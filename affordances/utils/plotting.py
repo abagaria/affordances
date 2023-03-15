@@ -59,7 +59,7 @@ def visualize_value_func(agent, params, replay, episode, experiment_name, seed):
   plt.close()
 
 
-def visualize_initiation_set(option, replay, episode, experiment_name, seed):
+def visualize_initiation_set(option, replay, episode, plot_path, seed, use_ucb:bool):
   states, x_positions, y_positions, infos = parse_replay(replay)
 
   values = []
@@ -78,7 +78,7 @@ def visualize_initiation_set(option, replay, episode, experiment_name, seed):
 
   for state_chunk, x_chunk, y_chunk, info_chunk in zip(state_chunks, x_chunks, y_chunks, info_chunks):
     value_chunk = option.initiation_learner.pessimistic_predict(state_chunk, info_chunk)
-    opt_value_chunk = option.initiation_learner.optimistic_predict(state_chunk, info_chunk)
+    opt_value_chunk = option.initiation_learner.optimistic_predict(state_chunk, info_chunk, use_ucb)
     value_list = value_chunk.tolist()
     opt_value_list = opt_value_chunk.tolist()
 
@@ -109,18 +109,18 @@ def visualize_initiation_set(option, replay, episode, experiment_name, seed):
   plt.colorbar()
   plt.title(f'Max Optimistic Init for {option}')
 
-  try: 
-    os.mkdir("./plots")
-  except OSError as error:
-    pass 
+  # try: 
+  #   os.mkdir("./plots")
+  # except OSError as error:
+  #   pass 
 
 
-  try: 
-    os.mkdir(f"./plots/{experiment_name}")
-  except OSError as error:
-    pass 
+  # try: 
+  #   os.mkdir(f"./plots/{experiment_name}")
+  # except OSError as error:
+  #   pass 
 
-  plt.savefig(f"./plots/{experiment_name}/{option}_init_{episode}.png")
+  plt.savefig(f"{plot_path}/{option}_init_{episode}.png")
   plt.close()
 
   # return x, y, pv, ov

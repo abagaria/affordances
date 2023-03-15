@@ -19,7 +19,8 @@ class Option:
     gestation_period: int,
     timeout: int,
     start_state_classifier,
-    exploration_bonus_scale: float):
+    exploration_bonus_scale: float,
+    optimistic_predict_count_based_bonus: bool):
       self._timeout = timeout
       self._solver = uvfa_policy
       self._option_idx = option_idx
@@ -44,6 +45,8 @@ class Option:
       self.success_curve = collections.deque(maxlen=100)
 
       self.visitation_counts = {} 
+
+      self.optimistic_predict_count_based_bonus = optimistic_predict_count_based_bonus
       # map from (agent_x, agent_y) --> num times in state. 
       # defaults to 1. 
 
@@ -60,7 +63,7 @@ class Option:
     if self.is_last_option and self._start_state_classifier(info):
       return True
 
-    decision1 = self.initiation_learner.optimistic_predict([state], [info]) 
+    decision1 = self.initiation_learner.optimistic_predict([state], [info], use_ucb=self.optimistic_predict_count_based_bonus) 
     decision2 = self.initiation_learner.pessimistic_predict([state], [info])
     return decision1 or decision2
 

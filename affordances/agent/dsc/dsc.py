@@ -25,6 +25,7 @@ class DSCAgent:
     env_steps: int = int(500_000),
     epsilon_decay_steps: int = 25_000,
     exploration_bonus_scale: float = 0,
+    optimistic_predict_count_based_bonus:bool = False 
   ):
 
     self._env = env
@@ -35,7 +36,8 @@ class DSCAgent:
     self._maintain_init_replay = maintain_init_replay
     self._max_n_options = max_n_options
     self._exploration_bonus_scale = exploration_bonus_scale
-    
+    self.optimistic_predict_count_based_bonus = optimistic_predict_count_based_bonus
+
     self._gpu = gpu
     self._device = f'cuda:{gpu}' if gpu > -1 else 'cpu'
     
@@ -69,6 +71,7 @@ class DSCAgent:
 
     self.chain.append(self.goal_option)
     self.new_options.append(self.goal_option)
+
 
   def select_option(self, state, info):
     cond = lambda o, s, i: o.optimistic_is_init_true(s, i) and not o.is_term_true(s, i)
@@ -157,7 +160,8 @@ class DSCAgent:
       goal_attainment_classifier=self.goal_attainment_classifier,
       gestation_period=self._gestation_period, timeout=self._timeout,
       start_state_classifier=self.start_state_classifier,
-      exploration_bonus_scale=self._exploration_bonus_scale)
+      exploration_bonus_scale=self._exploration_bonus_scale, 
+      optimistic_predict_count_based_bonus=self.optimistic_predict_count_based_bonus)
     classifier.option = option 
     return option 
 
@@ -168,7 +172,8 @@ class DSCAgent:
       goal_attainment_classifier=self.goal_attainment_classifier,
       gestation_period=self._gestation_period, timeout=self._timeout // 2,
       start_state_classifier=self.start_state_classifier,
-      exploration_bonus_scale=self._exploration_bonus_scale)
+      exploration_bonus_scale=self._exploration_bonus_scale, 
+      optimistic_predict_count_based_bonus=self.optimistic_predict_count_based_bonus)
 
   def create_uvfa_policy(self, n_actions, env_steps, epsilon_decay_steps):
     kwargs = dict(

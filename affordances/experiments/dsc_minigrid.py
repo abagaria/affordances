@@ -1,5 +1,7 @@
 '''
-python -m affordances.experiments.dsc_minigrid --experiment_name test --sub_dir test_subdir
+
+python -m affordances.experiments.dsc_minigrid --experiment_name=4rooms --environment_name='MiniGrid-FourRooms-v0' --seed=2 --n_episodes=5000 --log_dir=logs --exploration_bonus_scale=0 --gestation_period=5 --epsilon_decay_steps=25000 --checkpoint_init_learners --checkpoint_frequency 10 --plot_initiation_function --sub_dir ucb 
+
 '''
 
 import os
@@ -24,10 +26,12 @@ def create_agent(env, s0, i0, goal_info):
     goal_info, args.gpu_id, n_input_channels=1,
     maintain_init_replay=args.plot_initiation_function,
     epsilon_decay_steps=args.epsilon_decay_steps,
-    exploration_bonus_scale=args.exploration_bonus_scale)
+    exploration_bonus_scale=args.exploration_bonus_scale, 
+    optimistic_predict_count_based_bonus=args.optimistic_predict_count_based_bonus
+    )
 
 
-def train(agent: DSCAgent, env, n_episodes):
+def train(agent: DSCAgent, env, n_episodes, log_path:str, plot_path:str):
   rewards = []
   for episode in range(n_episodes):
     obs0, info0 = env.reset()
@@ -38,15 +42,15 @@ def train(agent: DSCAgent, env, n_episodes):
       f"InitPos': {info0['player_pos']}",
       f"FinalPos: {info['player_pos']}",
       f'Reward: {undiscounted_return}')
-    log(agent, rewards, episode)
+    log(agent, rewards, episode, log_path=log_path, plot_path=plot_path)
   return rewards
 
 
-def log(agent: DSCAgent, returns_so_far: list, episode: int):
+def log(agent: DSCAgent, returns_so_far: list, episode: int, log_path:str, plot_path:str):
   """Log DSC progress: includes learning curve, plotting, checkpointing."""
 
   utils.safe_zip_write(
-    f'{g_log_dir}/log_seed{args.seed}.pkl',
+    f'{log_path}/log_seed{args.seed}.pkl',
     dict(
       rewards=returns_so_far,
       current_episode=episode
@@ -55,10 +59,7 @@ def log(agent: DSCAgent, returns_so_far: list, episode: int):
 
   if args.checkpoint_init_learners and episode % args.checkpoint_frequency == 0:
     for option in agent.mature_options:
-      filename = f'{g_log_dir}/option_{option._option_idx}_init_{episode}.pth'
-      # option.initiation_learner.save(filename)
-      visualize_initiation_set(option, agent._init_replay_buffer, episode, experiment_name="test", seed=0)      
-      # agent._init_replay_buffer.save(f'{g_log_dir}/init_replay_{episode}.pkl')
+      visualize_initiation_set(option, agent._init_replay_buffer, episode, plot_path=plot_path, seed=0, use_ucb=agent.optimistic_predict_count_based_bonus)      
 
 
 if __name__ == '__main__':
@@ -79,6 +80,8 @@ if __name__ == '__main__':
   parser.add_argument('--log_dir', type=str, default='./affordances_logs')
   parser.add_argument('--exploration_bonus_scale', default=0, type=float)
   parser.add_argument('--epsilon_decay_steps', type=int, default=25_000)
+  parser.add_argument('--optimistic_predict_count_based_bonus', action='store_true', default=False)
+
   args = parser.parse_args()
 
   g_log_dir = os.path.join(args.log_dir, args.experiment_name, args.sub_dir)
@@ -87,6 +90,11 @@ if __name__ == '__main__':
   utils.create_log_dir(os.path.join(args.log_dir, args.experiment_name))
   utils.create_log_dir(os.path.join(args.log_dir, args.experiment_name, args.sub_dir))
   utils.create_log_dir(g_log_dir)
+
+  plot_path = os.path.join(g_log_dir, "plots")
+
+  if (args.plot_initiation_function): 
+    utils.create_log_dir(os.path.join(g_log_dir, "plots"))
 
   utils.set_random_seed(args.seed)
 
@@ -98,4 +106,4 @@ if __name__ == '__main__':
   print(environment)
   dsc_agent = create_agent(environment, start_state, start_info, goal_info_dict)
 
-  episodic_returns = train(dsc_agent, environment, args.n_episodes)
+  episodic_returns = train(dsc_agent, environment, args.n_episodes, g_log_dir, plot_path)
