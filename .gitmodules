@@ -1,0 +1,3 @@
+[submodule "affordances/domains/robosuite"]
+	path = affordances/domains/robosuite
+	url = git@github.com:babbatem/robosuite.git
