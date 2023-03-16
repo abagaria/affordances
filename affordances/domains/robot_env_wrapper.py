@@ -3,6 +3,44 @@ import numpy as np
 
 from gym import spaces 
 
+import robosuite as suite
+from robosuite.controllers import load_controller_config
+
+def make_robosuite_env(task):
+    
+    # create environment instance
+    controller_config = load_controller_config(default_controller="OSC_POSE")
+    controller_config["impedance_mode"] = "variable_kp"
+    controller_config["scale_stiffness"] = True
+    controller_config["safety_bool"] = False
+    controller_config["action_scale_param"] = 0.5 
+    options = {}
+    options["env_name"] = task
+    options["robots"] = "Panda"
+    options["controller_configs"] = controller_config
+    options["ee_fixed_to_handle"] = True
+    options["manip_strategy"] = "old"
+    options["p_constant"] = 1
+    options["m_constant"] = 1
+    options["ttt_constant"] = 1
+    options["hard_reset"] = True
+
+    # create and wrap env 
+    raw_env = suite.make(
+        **options,
+        has_renderer=True,
+        has_offscreen_renderer=False,
+        use_camera_obs=False,
+        reward_shaping=True,
+    )
+    env = RobotEnvWrapper(raw_env, 
+                           pregrasp_policy=True, 
+                           terminate_when_lost_contact=True,
+                           num_steps_lost_contact=500,
+                           optimal_ik=True,
+                           control_gripper=True)
+    return env 
+
 class Spec(object):
     def __init__(self,id):
         super().__init__()
@@ -39,15 +77,15 @@ class RobotEnvWrapper(gym.ObservationWrapper):
         self.num_broken = 0
         self.num_steps_lost_contact = num_steps_lost_contact
         self._max_episode_steps = 250
-        self.grasp_strategy=grasp_strategy
         self.learning = learning 
-        self.use_cached_qpos = use_cached_qpos 
         self.optimal_ik = optimal_ik
         self.terminate_when_lost_contact = terminate_when_lost_contact
         self.control_gripper = control_gripper
         self.optimal_ik = optimal_ik
 
     def get_states_from_grasps(self):
+        # TODO: for GVF estimation, get full state (e.g. contact forces, object positions) from grasps 
+        # alternatively learn GVF over subset of state space
         pass
 
     def reset_to(self, sampled_pose):
@@ -58,7 +96,7 @@ class RobotEnvWrapper(gym.ObservationWrapper):
         if sampled_pose is not None:
             keep_resetting = True
             while keep_resetting:
-                o = super().reset()
+                obs = super().reset()
                 self.grasp_success = self.reset_to_grasp(
                                         sampled_pose, wide=True, 
                                         optimal_ik=self.optimal_ik,
@@ -71,12 +109,12 @@ class RobotEnvWrapper(gym.ObservationWrapper):
                 if not self.learning:
                     keep_resetting = False
         else:
-            o = super().reset()
+            obs = super().reset()
             self.sim.forward()
 
         if self.pregrasp_policy:
-            o = self.execute_pregrasp()
-        return(o)
+            obs = self.execute_pregrasp()
+        return obs
 
     def execute_pregrasp(self):
         # close gripper for a few frames
@@ -90,10 +128,13 @@ class RobotEnvWrapper(gym.ObservationWrapper):
 
     def set_render(self, render_state):
         self.env.has_renderer = render_state
+
     def render(self, mode=None):
         self.env.render()
+
     def observation(self, obs):
-        return(np.concatenate((obs["robot0_proprio-state"],obs["object-state"])))
+        obs = np.concatenate((obs["robot0_proprio-state"],obs["object-state"]))
+        return obs
     
     def step(self, action):
         if not self.control_gripper:
@@ -103,9 +144,6 @@ class RobotEnvWrapper(gym.ObservationWrapper):
         if self.env.has_renderer:
             self.render()
 
-        # check arm qpos
-        # TODO: tolerance is hardcoded 0.1 rad
-        self.torque_history.append(self.env.robots[0].torques)
         lost_contact = False 
         if self.pre_grasp_complete and self.terminate_when_lost_contact:
 
@@ -115,7 +153,7 @@ class RobotEnvWrapper(gym.ObservationWrapper):
             if lost_contact:
                 done = True
                 success = False 
-            info["lost_contact"] = lost_contact
+        info["lost_contact"] = lost_contact
 
         unsafe = False
         if self.env.robots[0].check_q_limits():
@@ -130,12 +168,13 @@ class RobotEnvWrapper(gym.ObservationWrapper):
             done = True
         info["is_success"] = success 
 
-        if done and not self.is_eval_env:
-            self.init_learner.add_rollout(success)
-        
         return obs, reward, done, info
-            
 
-    def seed(self, seed=None):
-        """ set numpy seed etc. directly instead. """
-        pass
+
+if __name__ == '__main__':
+    env = make_robosuite_env("DoorCIP")
+    for i in range(10):
+        env.reset_to(None)
+        for j in range(10):
+            obs, rew, done, info = env.step(np.zeros(13))
+            env.render()
