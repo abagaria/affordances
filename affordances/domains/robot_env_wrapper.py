@@ -6,7 +6,7 @@ from gym import spaces
 import robosuite as suite
 from robosuite.controllers import load_controller_config
 
-def make_robosuite_env(task):
+def make_robosuite_env(task, render=False):
     
     # create environment instance
     controller_config = load_controller_config(default_controller="OSC_POSE")
@@ -23,12 +23,12 @@ def make_robosuite_env(task):
     options["p_constant"] = 1
     options["m_constant"] = 1
     options["ttt_constant"] = 1
-    options["hard_reset"] = True
+    options["hard_reset"] = True if not render else False
 
     # create and wrap env 
     raw_env = suite.make(
         **options,
-        has_renderer=True,
+        has_renderer=render,
         has_offscreen_renderer=False,
         use_camera_obs=False,
         reward_shaping=True,
@@ -134,7 +134,7 @@ class RobotEnvWrapper(gym.ObservationWrapper):
 
     def observation(self, obs):
         obs = np.concatenate((obs["robot0_proprio-state"],obs["object-state"]))
-        return obs
+        return obs.astype(np.float32)
     
     def step(self, action):
         if not self.control_gripper:
@@ -168,6 +168,7 @@ class RobotEnvWrapper(gym.ObservationWrapper):
             done = True
         info["is_success"] = success 
 
+        info["needs_reset"] = done
         return obs, reward, done, info
 
 
