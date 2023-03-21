@@ -188,7 +188,8 @@ class RobotEnvWrapper(gym.ObservationWrapper):
 if __name__ == '__main__':
     env = make_robosuite_env("DoorCIP", render=True)
     grasps = env.load_grasps()
-    for i in range(10):
+    for i in range(len(grasps)):
+        print(i)
         env.reset_to(grasps[i])
         for j in range(10):
             obs, rew, done, info = env.step(np.zeros(13))
