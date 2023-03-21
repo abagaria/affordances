@@ -1,3 +1,6 @@
+import os 
+import pickle 
+
 import gym
 import numpy as np 
 
@@ -88,6 +91,16 @@ class RobotEnvWrapper(gym.ObservationWrapper):
         # alternatively learn GVF over subset of state space
         pass
 
+    def load_grasps(self):
+        task = self.env.__class__.__name__
+        cur_dir = os.path.dirname(os.path.abspath(__file__))
+        heuristic_grasps_path = cur_dir + "/grasps/"+task+"_filtered.pkl"
+        heuristic_grasps = pickle.load(open(heuristic_grasps_path,"rb"))
+        grasp_list, self.grasp_wp_scores, self.grasp_qpos_list = list(zip(*heuristic_grasps))
+        grasp_list = np.array(grasp_list)
+        self.grasp_list = grasp_list
+        return grasp_list
+
     def reset_to(self, sampled_pose):
 
         self.pre_grasp_complete = False
@@ -173,9 +186,10 @@ class RobotEnvWrapper(gym.ObservationWrapper):
 
 
 if __name__ == '__main__':
-    env = make_robosuite_env("DoorCIP")
+    env = make_robosuite_env("DoorCIP", render=True)
+    grasps = env.load_grasps()
     for i in range(10):
-        env.reset_to(None)
+        env.reset_to(grasps[i])
         for j in range(10):
             obs, rew, done, info = env.step(np.zeros(13))
             env.render()
