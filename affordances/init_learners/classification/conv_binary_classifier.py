@@ -24,23 +24,30 @@ class ImageCNN(torch.nn.Module):
     assert x.max() <= 1.1, (x.max(), x.dtype)
     return self.model(x.float())
 
+class MLP(torch.nn.Module):
+  def __init__(self, input_dim):
+    self.model = torch.nn.Sequential(
+      torch.nn.Linear(in_features=input_dim, out_features=256)
+      torch.nn.ReLU(),
+      torch.nn.Linear(in_features=256, out_features=128),
+      torch.nn.ReLU(),
+      torch.nn.Linear(in_features=128, out_features=1) 
+    )
 
-class ConvClassifier:
-  """"Generic weighted binary convolutional classifier."""
+  def forward(self, x):
+    return self.model(x.float())
+
+
+class Classifier:
   def __init__(self,
         device,
         threshold=0.5,
-        n_input_channels=1,
-        batch_size=32,
-        lr=1e-3):
+        batch_size=32):
     
     self.device = device
     self.is_trained = False
     self.threshold = threshold
     self.batch_size = batch_size
-
-    self.model = ImageCNN(n_input_channels).to(device)
-    self.optimizer = torch.optim.Adam(self.model.parameters(), lr=lr)
 
     # Debug variables
     self.losses = []
@@ -84,8 +91,7 @@ class ConvClassifier:
     return enough_data and has_positives and has_negatives
 
   def preprocess_batch(self, X):
-    assert X.dtype == torch.uint8, X.dtype
-    return X.float() / 255.
+    raise NotImplementedError
 
   def fit(self, X, y, initiation_gvf=None, goal=None, n_epochs=1):
     dataset = ClassifierDataset(X, y)
@@ -144,6 +150,38 @@ class ConvClassifier:
     
     return np.mean(batch_losses)
 
+class ConvClassifier(Classifier):
+  """"Generic weighted binary convolutional classifier."""
+  def __init__(self,
+        device,
+        threshold=0.5,
+        n_input_channels=1,
+        batch_size=32,
+        lr=1e-3):
+
+    super().__init__(device=device, threshold=threshold, batch_size=batch_size)
+    self.model = ImageCNN(n_input_channels).to(device)
+    self.optimizer = torch.optim.Adam(self.model.parameters(), lr=lr)
+
+  def preprocess_batch(self, X):
+    assert X.dtype == torch.uint8, X.dtype
+    return X.float() / 255.
+
+class MlpClassifier(Classifier):
+  """"Generic weighted binary convolutional classifier."""
+  def __init__(self,
+        device,
+        input_dim,
+        threshold=0.5,
+        batch_size=32,
+        lr=1e-3):
+
+    super().__init__(device=device, threshold=threshold, batch_size=batch_size)
+    self.model = MLP(input_dim).to(device)
+    self.optimizer = torch.optim.Adam(self.model.parameters(), lr=lr)
+
+  def preprocess_batch(self, X):
+    return X
 
 class ClassifierDataset(Dataset):
   def __init__(self, states, labels):
