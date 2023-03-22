@@ -1,10 +1,8 @@
-import random 
+import numpy as np 
 
 class RandomGraspBaseline:
-  def __init__(self, grasps):
-    self.grasps = grasps 
-
-  def sample(self):
-    return random.choice(self.grasps)
+  def score(self, states: np.ndarray) -> np.ndarray:
+    n_states = len(states)
+    return np.random.rand(n_states)
 
     
