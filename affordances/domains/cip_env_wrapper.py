@@ -16,7 +16,8 @@ def make_robosuite_env(task, render=False):
     controller_config["impedance_mode"] = "variable_kp"
     controller_config["scale_stiffness"] = True
     controller_config["safety_bool"] = False
-    controller_config["action_scale_param"] = 0.5 
+    controller_config["action_scale_param"] = 0.5
+
     options = {}
     options["env_name"] = task
     options["robots"] = "Panda"
@@ -26,6 +27,7 @@ def make_robosuite_env(task, render=False):
     options["p_constant"] = 1
     options["m_constant"] = 1
     options["ttt_constant"] = 1
+    options["horizon"] = 250
     options["hard_reset"] = True if not render else False
 
     # create and wrap env 
@@ -79,12 +81,10 @@ class RobotEnvWrapper(gym.ObservationWrapper):
         self.pregrasp_policy = pregrasp_policy
         self.num_broken = 0
         self.num_steps_lost_contact = num_steps_lost_contact
-        self._max_episode_steps = 250
         self.learning = learning 
         self.optimal_ik = optimal_ik
         self.terminate_when_lost_contact = terminate_when_lost_contact
         self.control_gripper = control_gripper
-        self.optimal_ik = optimal_ik
 
     def get_states_from_grasps(self):
         # TODO: for GVF estimation, get full state (e.g. contact forces, object positions) from grasps 
