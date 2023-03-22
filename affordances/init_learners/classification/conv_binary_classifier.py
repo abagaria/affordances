@@ -26,8 +26,9 @@ class ImageCNN(torch.nn.Module):
 
 class MLP(torch.nn.Module):
   def __init__(self, input_dim):
+    super().__init__()
     self.model = torch.nn.Sequential(
-      torch.nn.Linear(in_features=input_dim, out_features=256)
+      torch.nn.Linear(in_features=input_dim, out_features=256),
       torch.nn.ReLU(),
       torch.nn.Linear(in_features=256, out_features=128),
       torch.nn.ReLU(),
@@ -42,12 +43,14 @@ class Classifier:
   def __init__(self,
         device,
         threshold=0.5,
-        batch_size=32):
+        batch_size=32,
+        lr=1e-3):
     
     self.device = device
     self.is_trained = False
     self.threshold = threshold
     self.batch_size = batch_size
+    self.optimizer = torch.optim.Adam(self.model.parameters(), lr=lr)
 
     # Debug variables
     self.losses = []
@@ -58,6 +61,12 @@ class Classifier:
     probabilities = torch.sigmoid(logits)
     threshold = self.threshold if threshold is None else threshold
     return probabilities > threshold
+
+  @torch.no_grad()
+  def predict_probs(self, X):
+    logits = self.model(X)
+    probabilities = torch.sigmoid(logits)
+    return probabilities
 
   def determine_pos_weight(self, y):
     n_negatives = len(y[y != 1])
@@ -159,9 +168,8 @@ class ConvClassifier(Classifier):
         batch_size=32,
         lr=1e-3):
 
-    super().__init__(device=device, threshold=threshold, batch_size=batch_size)
     self.model = ImageCNN(n_input_channels).to(device)
-    self.optimizer = torch.optim.Adam(self.model.parameters(), lr=lr)
+    super().__init__(device=device, threshold=threshold, batch_size=batch_size, lr=lr)
 
   def preprocess_batch(self, X):
     assert X.dtype == torch.uint8, X.dtype
@@ -176,9 +184,8 @@ class MlpClassifier(Classifier):
         batch_size=32,
         lr=1e-3):
 
-    super().__init__(device=device, threshold=threshold, batch_size=batch_size)
     self.model = MLP(input_dim).to(device)
-    self.optimizer = torch.optim.Adam(self.model.parameters(), lr=lr)
+    super().__init__(device=device, threshold=threshold, batch_size=batch_size, lr=lr)
 
   def preprocess_batch(self, X):
     return X

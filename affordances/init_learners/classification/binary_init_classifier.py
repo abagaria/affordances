@@ -5,29 +5,25 @@ import numpy as np
 
 from affordances.utils import utils
 from affordances.init_learners.classification.init_classifier import InitiationClassifier
-from affordances.init_learners.classification.conv_binary_classifier import ConvClassifier
+from affordances.init_learners.classification.conv_binary_classifier import ConvClassifier, MlpClassifier
 
 
-class ConvInitiationClassifier(InitiationClassifier):
+class BinaryInitiationClassifier(InitiationClassifier):
   def __init__(self,
     device, 
     optimistic_threshold: float,
     pessimistic_threshold: float,
-    n_input_channels: int = 1,
     maxlen: int = 10
   ):
     self.device = device
     self.optimistic_threshold = optimistic_threshold
     self.pessimistic_threshold = pessimistic_threshold
-    self.n_input_channels = n_input_channels
-    
-    self.classifier = ConvClassifier(device, None, n_input_channels)
-    
+  
     super().__init__(max_n_trajectories=maxlen)
 
   def _predict(self, states: np.ndarray, threshold) -> np.ndarray:
     state_tensor = utils.tensorfy(states, self.device)
-    preprocessed_tensor = state_tensor / 255.
+    preprocessed_tensor = self.classifier.preprocess_batch(state_tensor)
     predictions = self.classifier.predict(preprocessed_tensor, threshold)
     predictions = predictions.cpu().numpy()
     if predictions.shape == (1, 1):
@@ -39,6 +35,13 @@ class ConvInitiationClassifier(InitiationClassifier):
 
   def pessimistic_predict(self, states: np.ndarray) -> np.ndarray:
     return self._predict(states, self.pessimistic_threshold)
+
+  def score(self, states: np.ndarray) -> np.ndarray:
+    state_tensor = utils.tensorfy(states, self.device)
+    preprocessed_tensor = self.classifier.preprocess_batch(state_tensor)
+    scores = self.classifier.predict_probs(preprocessed_tensor)
+    scores = scores.cpu().numpy()
+    return scores.reshape(-1)
 
   def add_trajectory(self, trajectory, success_label):
     infos = [transition[-1] for transition in trajectory]
@@ -72,7 +75,50 @@ class ConvInitiationClassifier(InitiationClassifier):
     torch.save(self.classifier.model.state_dict(), filename)
 
   def load(self, filename: str):
+    raise NotImplementedError
+
+class ConvInitiationClassifier(BinaryInitiationClassifier):
+  def __init__(device, 
+    optimistic_threshold: float,
+    pessimistic_threshold: float,
+    n_input_channels: int = 1,
+    maxlen: int = 10
+  ): 
+    self.classifier = ConvClassifier(device, None, n_input_channels)
+    self.n_input_channels = n_input_channels
+    super().__init__(device, 
+      optimistic_threshold, 
+      pessimistic_threshold, 
+      maxlen=maxlen
+    )
+
+  def load(self, filename: str):
     self.classifier = ConvClassifier(self.device, None, self.n_input_channels)
     self.classifier.model.load_state_dict(
       torch.load(filename)
     )
+
+class MlpInitiationClassifier(BinaryInitiationClassifier):
+  def __init__(self,
+    device, 
+    optimistic_threshold: float,
+    pessimistic_threshold: float,
+    input_dim: int = 1,
+    maxlen: int = 10
+  ):
+    self.classifier = MlpClassifier(device, input_dim)
+    self.input_dim = input_dim
+    super().__init__(device, 
+      optimistic_threshold,
+      pessimistic_threshold,
+      maxlen=maxlen
+    )
+
+  def load(self, filename: str):
+    self.classifier = MlpClassifier(self.device, None, self.input_dim)
+    self.classifier.model.load_state_dict(
+      torch.load(filename)
+    )
+
+
+
