@@ -46,11 +46,19 @@ def train(agent: DSCAgent, env, n_episodes):
 def log(agent: DSCAgent, returns_so_far: list, episode: int):
   """Log DSC progress: includes learning curve, plotting, checkpointing."""
 
+  option_logs = dict()
+
+  for option in agent.chain:
+    option_logs[str(option)] = option.debug_log
+
   utils.safe_zip_write(
     f'{g_log_dir}/log_seed{args.seed}.pkl',
     dict(
       rewards=returns_so_far,
-      current_episode=episode
+      current_episode=episode,
+      option_logs=option_logs,
+      start=start_info,
+      goal=goal_info_dict
     )
   )
 
