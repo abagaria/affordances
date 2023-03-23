@@ -128,6 +128,11 @@ if __name__ == '__main__':
 
   utils.set_random_seed(args.seed)
 
+   # log args
+  run_dict = vars(args)
+  run_dict_file = os.path.join(g_log_dir, "config.pkl")
+  utils.safe_zip_write(run_dict_file, run_dict)
+
   env = make_robosuite_env(args.environment_name, deterministic=True, render=False)
   td3_agent = create_agent(
     env.action_space, 
