@@ -10,6 +10,10 @@ from minigrid.wrappers import RGBImgObsWrapper, ImgObsWrapper, ReseedWrapper, St
 class MinigridInfoWrapper(Wrapper):
   """Include extra information in the info dict for debugging/visualizations."""
 
+  def __init__(self, env):
+    super().__init__(env)
+    self._timestep = 0
+
   def reset(self):
     obs, info = self.env.reset()
     info = self._modify_info_dict(info)
@@ -17,6 +21,7 @@ class MinigridInfoWrapper(Wrapper):
 
   def step(self, action):
     obs, reward, terminated, truncated, info = self.env.step(action)
+    self._timestep += 1
     info = self._modify_info_dict(info, terminated, truncated)
     done = terminated or truncated
     return obs, reward, done, info
@@ -28,6 +33,7 @@ class MinigridInfoWrapper(Wrapper):
     info['truncated'] = truncated
     info['terminated'] = terminated
     info['needs_reset'] = truncated  # pfrl needs this flag
+    info['timestep'] = self._timestep # total number of timesteps in env
     return info
 
 
