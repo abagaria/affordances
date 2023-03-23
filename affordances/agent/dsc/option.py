@@ -44,10 +44,12 @@ class Option:
       self.num_goal_hits = 0
       self.num_executions = 0
       self.effect_set = collections.deque(maxlen=20)
-      self.success_curve = collections.deque(maxlen=100)
 
       self.positive_examples = collections.deque([], maxlen=10)
       self.pessimistic_initiation_samples = []
+
+      # Information for logging and debugging
+      self.debug_log = collections.defaultdict(list)
 
       print(f'Created {self} with bonus_scale={exploration_bonus_scale}')
 
@@ -174,8 +176,8 @@ class Option:
       reset = info['needs_reset']
       total_reward += reward
 
-    self.success_curve.append(reached)
     self.update_option_after_rollout(goal, goal_info, trajectory, reached)
+    self.log_progress(info, reached, goal_info)
 
     return state, info, total_reward, done, reset, reached, n_steps
   
@@ -250,6 +252,12 @@ class Option:
   def get_augmeted_state(self, state, goal):
     assert state.shape == (1, 84, 84), state.shape
     return np.concatenate((state, goal), axis=0)
+  
+  def log_progress(self, info, success, goal_info):
+    self.debug_log['timesteps'].append(info['timestep'])
+    self.debug_log['successes'].append(success)
+    self.debug_log['goals'].append(goal_info)
+    self.debug_log['phases'].append(self.training_phase)
 
   def __hash__(self) -> int:
     return self._option_idx
