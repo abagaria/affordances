@@ -1,4 +1,5 @@
 import os 
+import copy 
 import pickle 
 
 import gym
@@ -9,7 +10,7 @@ from gym import spaces
 import robosuite as suite
 from robosuite.controllers import load_controller_config
 
-def make_robosuite_env(task, render=False):
+def make_robosuite_env(task, deterministic=True, render=False):
     
     # create environment instance
     controller_config = load_controller_config(default_controller="OSC_POSE")
@@ -38,12 +39,15 @@ def make_robosuite_env(task, render=False):
         use_camera_obs=False,
         reward_shaping=True,
     )
+    
+    raw_env.deterministic_reset = deterministic
     env = RobotEnvWrapper(raw_env, 
                            pregrasp_policy=True, 
                            terminate_when_lost_contact=True,
                            num_steps_lost_contact=500,
                            optimal_ik=True,
-                           control_gripper=True)
+                           control_gripper=True,
+                           use_qpos_cache=deterministic)
     return env 
 
 class Spec(object):
@@ -60,7 +64,8 @@ class RobotEnvWrapper(gym.ObservationWrapper):
                  terminate_when_lost_contact=False,
                  num_steps_lost_contact=500,
                  optimal_ik=False,
-                 control_gripper=False,):
+                 control_gripper=False,
+                 use_qpos_cache=False):
 
         # setup action space 
         low_limits = env.action_spec[0]
@@ -85,11 +90,15 @@ class RobotEnvWrapper(gym.ObservationWrapper):
         self.optimal_ik = optimal_ik
         self.terminate_when_lost_contact = terminate_when_lost_contact
         self.control_gripper = control_gripper
+        self.qpos_cache = {} 
+        self.use_qpos_cache = use_qpos_cache
 
     def get_states_from_grasps(self):
-        # TODO: for GVF estimation, get full state (e.g. contact forces, object positions) from grasps 
-        # alternatively learn GVF over subset of state space
-        pass
+        states = []
+        for grasp in self.grasp_list:
+            obs = self.reset_to(grasp)
+            states.append(obs)
+        return np.array(states)
 
     def load_grasps(self):
         task = self.env.__class__.__name__
@@ -101,32 +110,56 @@ class RobotEnvWrapper(gym.ObservationWrapper):
         self.grasp_list = grasp_list
         return grasp_list
 
+    def reset_to_idx(self, idx):
+        return self.reset_to(self.grasp_list[idx])
+
     def reset_to(self, sampled_pose):
+        obs = super().reset()
 
         self.pre_grasp_complete = False
         self.contact_hist = [True]*self.num_steps_lost_contact
 
         if sampled_pose is not None:
-            keep_resetting = True
-            while keep_resetting:
-                obs = super().reset()
-                self.grasp_success = self.reset_to_grasp(
-                                        sampled_pose, wide=True, 
-                                        optimal_ik=self.optimal_ik,
-                                        frame=self.get_obj_pose(),
-                                        verbose=self.env.has_renderer
-                                     )
-                if self.grasp_success:   
-                    keep_resetting = False
 
-                if not self.learning:
-                    keep_resetting = False
-        else:
-            obs = super().reset()
-            self.sim.forward()
+            # compute index of sampled_pose 
+            # TODO: instead use index to reset?
+            sampled_idx = -1
+            for i, g in enumerate(self.grasp_list):
+                if np.all(sampled_pose == g):
+                    sampled_idx = i 
+            assert sampled_idx >= 0
 
-        if self.pregrasp_policy:
-            obs = self.execute_pregrasp()
+            # maybe check qpos_cache
+            if self.use_qpos_cache and sampled_idx in self.qpos_cache.keys():
+                assert self.deterministic_reset     
+                qpos = self.qpos_cache[sampled_idx]
+                self.grasp_success = self.reset_to_qpos(qpos, wide=True)
+                assert self.grasp_success
+
+            else:
+
+                # reset until grasp is feasible
+                # TODO: rethink this...return None?
+                # update score and sample again?  
+                keep_resetting = True
+                while keep_resetting:
+                    self.grasp_success = self.reset_to_grasp(
+                                            sampled_pose, wide=True, 
+                                            optimal_ik=self.optimal_ik,
+                                            frame=self.get_obj_pose(),
+                                            verbose=self.env.has_renderer
+                                         )
+                    if self.grasp_success:   
+                        keep_resetting = False
+                        if self.use_qpos_cache:
+                            self.qpos_cache[sampled_idx] = copy.deepcopy(self.sim.data.qpos[:7])
+
+                    if not self.learning:
+                        keep_resetting = False
+
+            if self.pregrasp_policy:
+                obs = self.execute_pregrasp()
+
         return obs
 
     def execute_pregrasp(self):
@@ -186,11 +219,18 @@ class RobotEnvWrapper(gym.ObservationWrapper):
 
 
 if __name__ == '__main__':
+
+    from affordances.utils import utils
+    utils.set_random_seed(0)
+
     env = make_robosuite_env("DoorCIP", render=True)
+    # env = make_robosuite_env("LeverCIP", render=True)
+    # env = make_robosuite_env("SlideCIP", render=True)
+    # env = make_robosuite_env("DrawerCIP", render=True)
     grasps = env.load_grasps()
-    for i in range(len(grasps)):
-        print(i)
-        env.reset_to(grasps[i])
+    for i in range(200):
+        print(i % len(grasps))
+        env.reset_to(grasps[i % len(grasps)])
         for j in range(10):
             obs, rew, done, info = env.step(np.zeros(13))
             env.render()
