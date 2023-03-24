@@ -8,7 +8,7 @@ class RandomGraspBaseline:
   def update(self):
     pass 
 
-  def add_trajectory(transitions, success):
+  def add_trajectory(self, transitions, success):
     pass 
 
     
