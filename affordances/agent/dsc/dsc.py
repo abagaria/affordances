@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import random
 import collections
 import numpy as np
@@ -29,7 +31,10 @@ class DSCAgent:
     env_steps: int = int(500_000),
     epsilon_decay_steps: int = 25_000,
     exploration_bonus_scale: float = 0,
-    use_her_for_policy_evaluation: bool = False
+    use_her_for_policy_evaluation: bool = False,
+    n_actions: int | None = None,
+    optimistic_threshold: float = .70,
+    pessimistic_threshold: float = 0.80,
   ):
 
     self._env = env
@@ -41,6 +46,9 @@ class DSCAgent:
     self._max_n_options = max_n_options
     self._exploration_bonus_scale = exploration_bonus_scale
     self._use_her_for_policy_evaluation = use_her_for_policy_evaluation
+    self._n_actions = n_actions if n_actions is not None else env.action_space.n
+    self._optimistic_threshold = optimistic_threshold
+    self._pessimistic_threshold = pessimistic_threshold
     
     self._gpu = gpu
     self._device = f'cuda:{gpu}' if gpu > -1 else 'cpu'
@@ -57,16 +65,11 @@ class DSCAgent:
     assert init_learner_type in ('binary', 'td0', 'lstd-rp', 'neural-lstd', 'weighted-binary')
 
     self.uvfa_policy = self.create_uvfa_policy(
-      n_actions=env.action_space.n,
       env_steps=env_steps,
       epsilon_decay_steps=epsilon_decay_steps
     )
 
     self.initiation_learner = self.create_initiation_learner()
-
-    self._init_replay_buffer = None
-    if maintain_init_replay:
-      self._init_replay_buffer = ReplayBuffer(capacity=int(1e4))
 
     self.chain = []
     self.new_options = []
@@ -99,7 +102,7 @@ class DSCAgent:
         subgoal = self.get_subgoal_for_global_option(state)
 
       state, info, reward, done, reset, reached, n_steps = option.rollout(
-        self._env, state, info, *subgoal, init_replay=self._init_replay_buffer)
+        self._env, state, info, *subgoal)
       self.manage_chain_after_rollout(option)
 
       rewards.append(reward)
@@ -233,10 +236,12 @@ class DSCAgent:
       parent_positive_examples=collections.deque([]),
       use_her_for_policy_evaluation=self._use_her_for_policy_evaluation)
 
-  def create_uvfa_policy(self, n_actions, env_steps, epsilon_decay_steps):
+  def create_uvfa_policy(self, env_steps, epsilon_decay_steps):
     kwargs = dict(
       n_atoms=51, v_max=10., v_min=-10.,
-      noisy_net_sigma=0.5, lr=6.25e-5, n_steps=3,
+      noisy_net_sigma=0.5,
+      lr=1e-4,
+      n_steps=3,
       betasteps=env_steps // 4,
       replay_start_size=10_000, 
       replay_buffer_size=int(5e5),
@@ -245,7 +250,7 @@ class DSCAgent:
       final_epsilon=0.1,
       epsilon_decay_steps=epsilon_decay_steps
     )
-    return Rainbow(3, **kwargs)
+    return Rainbow(self._n_actions, **kwargs)
 
   def create_init_classifier(self):
     if self._init_learner_type == 'binary':
@@ -260,7 +265,9 @@ class DSCAgent:
     if self._init_learner_type == 'td0':
       return GoalConditionedInitiationGVF(
         target_policy=self.uvfa_policy.agent.batch_act,
-        n_actions=self._env.action_space.n,
+        n_actions=self._n_actions,
         n_input_channels=2*self._n_input_channels,
+        optimistic_threshold=self._optimistic_threshold,
+        pessimistic_threshold=self._pessimistic_threshold
       )
     raise NotImplementedError()
