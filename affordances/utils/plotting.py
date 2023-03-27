@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from pfrl.replay_buffers.prioritized import PrioritizedReplayBuffer
 from affordances import utils
+from affordances.init_learners.gvf.init_gvf import InitiationGVF
 
 
 def parse_replay(replay):
@@ -76,5 +77,25 @@ def visualize_gc_initiation_learner(
   plt.scatter(x, y, c=v)
   plt.colorbar()
   plt.title(f'Goal pos: {goal_info["player_pos"]}')
-  plt.savefig(f'{plot_base_dir}/{experiment_name}/{seed}/init_vf_{episode}.png')
+  plt.savefig(f'{plot_base_dir}/{experiment_name}/init_vf_{seed}_{episode}.png')
   plt.close()
+
+
+def offline_visuzlize_gc_initiation_learner(
+    path_to_init_learner,
+    n_actions,
+    goal, goal_info,
+    episode, plot_base_dir, experiment_name, seed
+  ):
+  """Visualize the init learner when you just have access to the saved model."""
+  assert '.pth' in path_to_init_learner
+  init_learner = InitiationGVF(
+    target_policy=None,
+    n_actions=n_actions,
+    n_input_channels=1,
+  )
+  init_learner.load(path_to_init_learner)
+  visualize_gc_initiation_learner(
+    init_learner, init_learner.initiation_replay_buffer,
+    goal, goal_info, episode, plot_base_dir, experiment_name, seed
+  )
