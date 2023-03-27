@@ -14,6 +14,9 @@ class MinigridInfoWrapper(Wrapper):
     super().__init__(env)
     self._timestep = 0
 
+    # Store the test-time start state when the environment is constructed
+    self.official_start_obs, self.official_start_info = self.reset()
+
   def reset(self):
     obs, info = self.env.reset()
     info = self._modify_info_dict(info)
@@ -110,17 +113,29 @@ class RandomStartWrapper(Wrapper):
     self.n_episodes = 0
     self.start_locations = pickle.load(open(start_loc_file, 'rb'))
 
+    # TODO(ab): This assumes that the 2nd-to-last action is unused in the env
+    # Not using the last action because that terminates the episode!
+    self.no_op_action = env.action_space.n - 2
+
   def reset(self):
-    obs, info = super().reset()
+    super().reset()
     rand_pos = self.start_locations[self.n_episodes % len(self.start_locations)]
+    self.n_episodes += 1
+    return self.reset_to(rand_pos)
+
+  def reset_to(self, rand_pos):
     new_pos = self.env.place_agent(
       top=rand_pos,
       size=(3, 3)
     )
+
+    # Apply the no-op to get the observation image
+    obs, _, _, info = self.env.step(self.no_op_action)
+
     info['player_x'] = new_pos[0]
     info['player_y'] = new_pos[1]
     info['player_pos'] = new_pos
-    self.n_episodes += 1
+    
     return obs, info
 
 
