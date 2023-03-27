@@ -61,8 +61,9 @@ class Option:
     if self._is_global_option or self.training_phase == 'gestation':
       return True
 
-    if self.is_last_option and self._start_state_classifier(info):
-      return True
+    # TODO(ab): this is useful for classification approach, but not for GVF approach
+    # if self.is_last_option and self._start_state_classifier(info):
+    #   return True
     
     goals = self.get_potential_goals(state, info)
 
@@ -131,7 +132,7 @@ class Option:
         return list(self.effect_set)
       return self.parent_positive_examples
     gcrf = self._goal_attainment_classifier
-    return [g for g in get_all_goals() if not gcrf(info, g[1])]
+    return [g for g in get_all_goals() if not gcrf(info, g[1]) and not g[1]['terminated']]
     # return [goal for goal in unachieved_goals if self.is_term_true(*goal)]
   
   def get_value_for_all_goals(self, state, goals):
@@ -147,7 +148,7 @@ class Option:
     examples = [(obs, info) for obs, info in zip(observations, infos)]
     self.positive_examples.append(examples)
 
-  def rollout(self, env, state, info, goal, goal_info, init_replay):
+  def rollout(self, env, state, info, goal, goal_info):
     """Execute the option policy from `state` towards `goal`."""
        
     done = False
@@ -165,11 +166,6 @@ class Option:
 
       n_steps += 1
       trajectory.append((state, action, reward, next_state, info))
-  
-      if init_replay is not None:
-        init_replay.append(state, action, reward, next_state,
-          is_state_terminal=info['terminated'], extra_info=info)
-  
       reached = self.at_local_goal(next_state, info, goal, goal_info)
 
       state = next_state
