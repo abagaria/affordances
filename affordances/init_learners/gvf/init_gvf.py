@@ -18,8 +18,8 @@ class InitiationGVF(InitiationLearner):
       n_actions: int,
       n_input_channels: int,
       batch_size: int = 1024,
-      optimistic_threshold: float = 0.5,
-      pessimistic_threshold: float = 0.75,
+      optimistic_threshold: float = 0.7,
+      pessimistic_threshold: float = 0.8,
       use_prioritized_buffer: bool = True,
       init_replay_capacity: int = 100_000):
     super().__init__()
