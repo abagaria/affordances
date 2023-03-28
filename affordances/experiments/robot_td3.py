@@ -56,6 +56,7 @@ def train(agent: TD3, init_learner, sample_func, env, n_episodes):
   grasps = env.load_grasps()
   grasp_state_vectors = env.get_states_from_grasps()
   grasp_counts = {}
+  grasp_success = {}
   for i in range(len(grasps)):
     grasp_counts[i] = 0
 
@@ -83,6 +84,7 @@ def train(agent: TD3, init_learner, sample_func, env, n_episodes):
     episodic_rewards.append(episode_reward)
     episodic_success.append(success)
     grasp_counts[selected_idx]+=1
+    grasp_success[selected_idx]+=info['success']
     print(f'Episode {episode} Reward {episode_reward} Success {success}')
     
     init_learner.add_trajectory(trajectory, success)
@@ -98,7 +100,8 @@ def train(agent: TD3, init_learner, sample_func, env, n_episodes):
             current_step_count=n_steps,
             classifier_loss=init_learner.classifier.losses if type(init_learner) is not RandomGraspBaseline else [],
             scores=grasp_scores,
-            counts=grasp_counts
+            counts=grasp_counts,
+            grasp_success=grasp_success
           )
       )
   return episodic_rewards
