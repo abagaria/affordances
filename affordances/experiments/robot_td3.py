@@ -59,6 +59,7 @@ def train(agent: TD3, init_learner, sample_func, env, n_episodes):
   grasp_success = {}
   for i in range(len(grasps)):
     grasp_counts[i] = 0
+    grasp_success[i] = 0 
 
   for episode in range(n_episodes):
     done = False
