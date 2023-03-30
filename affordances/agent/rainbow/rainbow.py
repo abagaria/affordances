@@ -14,10 +14,12 @@ class Rainbow:
   def __init__(self, n_actions, n_atoms, v_min, v_max, noisy_net_sigma, lr, 
          n_steps, betasteps, replay_start_size, replay_buffer_size, gpu,
          n_obs_channels, use_custom_batch_states=True,
-         epsilon_decay_steps=None, final_epsilon=0.1):
+         epsilon_decay_steps=None, final_epsilon=0.1,
+         update_interval: int = 4):
     self.n_actions = n_actions
     n_channels = n_obs_channels
     self.use_custom_batch_states = use_custom_batch_states
+    self.update_interval = update_interval
 
     self.q_func = DistributionalDuelingDQN(n_actions, n_atoms, v_min, v_max, n_input_channels=n_channels)
     pnn.to_factorized_noisy(self.q_func, sigma_scale=noisy_net_sigma)
@@ -60,7 +62,7 @@ class Rainbow:
       minibatch_size=32,
       replay_start_size=replay_start_size,
       target_update_interval=32_000,
-      update_interval=4,
+      update_interval=update_interval,
       batch_accumulator="mean",
       phi=self.phi,
       batch_states=self.batch_states if use_custom_batch_states else pfrl_batch_states
@@ -89,6 +91,8 @@ class Rainbow:
 
   def step(self, state, action, reward, next_state, done, reset):
     """ Learning update based on a given transition from the environment. """
+    reset = reset['needs_reset'] if isinstance(reset, dict) else reset
+    assert isinstance(reset, bool), type(reset)
     self._overwrite_pfrl_state(state, action)
     self.agent.observe(next_state, reward, done, reset)
 
