@@ -96,9 +96,9 @@ def log(agent: DSCAgent, returns_so_far: list, episode: int):
     for option in agent.mature_options:
       assert isinstance(option, Option)
       goal, goal_info = option.sample_goal(
-        random.choice(
+        *random.choice(
           utils.flatten(option.initiation_classifier.positive_examples)
-        )[0]
+        )
       )
       plotting_utils.visualize_initiation_classifier(
         option.initiation_classifier,

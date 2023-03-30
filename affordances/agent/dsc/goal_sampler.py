@@ -7,18 +7,21 @@ from affordances.utils import utils
 
 
 def reachability_sample(
-    state,
+    state, info,
     positive_examples,
     parent_classifier,
     gcvf,
+    goal_achievement_func,
     sampling_method='argmax'
 ):
   """Sample the most reachable from the set of feasible goals.
     Args:
       state: np.ndarray current state
+      info: info dict corresponding to the current state
       positive_examples: list of lists, each inner list is a (obs, info) traj
       parent_classifier: function from observations -> set membership decisions
       gcvf: goal-conditioned value func maps states, goals -> values
+      goal_achievement_func: map from (info, goal_info) -> {0, 1}
       sampling_method: str argmax, softmax, sum
   
     Returns:
@@ -29,10 +32,11 @@ def reachability_sample(
 
   def get_feasible_goals(goals: list):
     """Convert a list of potential goals to a list of feasible ones."""
-    goal_observations = np.asarray([goal_tuple[0] for goal_tuple in goals])
+    unachieved = _get_unachieved_goals(info, goals, goal_achievement_func)
+    goal_observations = np.asarray([goal_tuple[0] for goal_tuple in unachieved])
     predictions = parent_classifier(goal_observations).squeeze(1)
     if predictions.any():
-      return [goals[i] for i in range(len(goals)) if predictions[i]]
+      return [unachieved[i] for i in range(len(unachieved)) if predictions[i]]
 
   def get_values_for_goals(goals: np.ndarray):
     """Return the values of the current state conditioned on input goals."""
@@ -68,11 +72,19 @@ def reachability_sample(
     raise NotImplementedError(sampling_method)
 
 
-def first_state_sample(positive_examples, parent_classifier):
+def first_state_sample(
+    state, info,
+    positive_examples,
+    parent_classifier,
+    goal_achievement_func
+):
   """Sample a random trajectory and pick the first state in term set.
     Args:
+      state: np array of the current state
+      info: dict of the current state
       positive_examples: list of lists, each inner list is a (obs, info) traj
       parent_classifier: function from observations -> set membership decisions
+      goal_achievement_func: if goal is achieved at state
   
     Returns:
       goal_obs: np.ndarray goal observation
@@ -92,7 +104,22 @@ def first_state_sample(positive_examples, parent_classifier):
     num_tries += 1
     trajectory_idx = random.choice(range(len(positive_examples)))
     sampled_trajectory = positive_examples[trajectory_idx]
-    state, info = get_first_state_in_term_classifier(sampled_trajectory)
-    if parent_classifier([state]):
-      return state, info
-  
+    filtered_trajectory = _get_unachieved_goals(
+      info, sampled_trajectory, goal_achievement_func)
+    if len(filtered_trajectory) > 0:
+      state, info = get_first_state_in_term_classifier(filtered_trajectory)
+      if parent_classifier([state]):
+        return state, info
+
+
+def _get_unachieved_goals(info, goals, achievement_func):
+  """Return subset of goals that are not achieved at the current state.
+  Args:
+    info: current state
+    goals: list of (np.ndarray, dict) tuples representing the candidate goals
+    achievement_func: map from (state, goal) -> {0, 1}
+
+  Returns:
+    unachieved_goals: list of filtered goals.
+  """
+  return [goal for goal in goals if not achievement_func(info, goal[1])]

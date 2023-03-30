@@ -94,7 +94,7 @@ class DSCAgent:
 
     while not done and not reset:
       option = self.select_option(state, info)
-      subgoal = option.sample_goal(state)
+      subgoal = option.sample_goal(state, info)
       
       if subgoal is None:
         subgoal = self.get_subgoal_for_global_option(state)

@@ -99,15 +99,16 @@ class Option:
     augmented_state = self.get_augmeted_state(state, goal)
     return self._solver.act(augmented_state)
 
-  def sample_goal(self, state):
+  def sample_goal(self, state, info):
     """Sample a goal to pursue from the option's termination region."""
 
     if self._option_idx > 1:
       sample = goal_sampler.reachability_sample(
-        state,
+        state, info,
         self.parent_initiation_classifier.positive_examples,
         self.parent_initiation_classifier.pessimistic_predict,
-        self.initiation_gvf.get_values
+        self.initiation_gvf.get_values,
+        self._goal_attainment_classifier
       )
 
       if sample is not None:
