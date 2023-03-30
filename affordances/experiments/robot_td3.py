@@ -137,7 +137,7 @@ if __name__ == '__main__':
   run_dict_file = os.path.join(g_log_dir, "config.pkl")
   utils.safe_zip_write(run_dict_file, run_dict)
 
-  env = make_robosuite_env(args.environment_name, deterministic=True, render=False)
+  env = make_robosuite_env(args.environment_name, deterministic=True, render=False, use_qpos_cache=True)
   td3_agent = create_agent(
     env.action_space, 
     env.observation_space,
