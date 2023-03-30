@@ -10,7 +10,7 @@ from gym import spaces
 import robosuite as suite
 from robosuite.controllers import load_controller_config
 
-def make_robosuite_env(task, deterministic=True, render=False):
+def make_robosuite_env(task, deterministic=True, render=False, use_qpos_cache=False, pregrasp=True, optimal_ik=True, learning=True):
     
     # create environment instance
     controller_config = load_controller_config(default_controller="OSC_POSE")
@@ -40,14 +40,18 @@ def make_robosuite_env(task, deterministic=True, render=False):
         reward_shaping=True,
     )
     
+    if not deterministic:
+        assert use_qpos_cache == False
+
     raw_env.deterministic_reset = deterministic
     env = RobotEnvWrapper(raw_env, 
-                           pregrasp_policy=True, 
+                           pregrasp_policy=pregrasp, 
+                           learning=learning,
                            terminate_when_lost_contact=True,
                            num_steps_lost_contact=500,
-                           optimal_ik=True,
+                           optimal_ik=optimal_ik,
                            control_gripper=True,
-                           use_qpos_cache=deterministic)
+                           use_qpos_cache=use_qpos_cache)
     return env 
 
 class Spec(object):
@@ -123,11 +127,12 @@ class RobotEnvWrapper(gym.ObservationWrapper):
 
             # compute index of sampled_pose 
             # TODO: instead use index to reset?
-            sampled_idx = -1
-            for i, g in enumerate(self.grasp_list):
-                if np.all(sampled_pose == g):
-                    sampled_idx = i 
-            assert sampled_idx >= 0
+            if self.use_qpos_cache:
+                sampled_idx = -1
+                for i, g in enumerate(self.grasp_list):
+                    if np.all(sampled_pose == g):
+                        sampled_idx = i 
+                assert sampled_idx >= 0
 
             # maybe check qpos_cache
             if self.use_qpos_cache and sampled_idx in self.qpos_cache.keys():
@@ -228,7 +233,7 @@ if __name__ == '__main__':
     # env = make_robosuite_env("SlideCIP", render=True)
     # env = make_robosuite_env("DrawerCIP", render=True)
     grasps = env.load_grasps()
-    for i in range(200):
+    for i in range(len(grasps)):
         print(i % len(grasps))
         env.reset_to(grasps[i % len(grasps)])
         for j in range(10):
