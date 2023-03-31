@@ -228,9 +228,9 @@ if __name__ == '__main__':
     from affordances.utils import utils
     utils.set_random_seed(0)
 
-    env = make_robosuite_env("DoorCIP", render=True)
+    # env = make_robosuite_env("DoorCIP", render=True)
     # env = make_robosuite_env("LeverCIP", render=True)
-    # env = make_robosuite_env("SlideCIP", render=True)
+    env = make_robosuite_env("SlideCIP", render=True)
     # env = make_robosuite_env("DrawerCIP", render=True)
     grasps = env.load_grasps()
     for i in range(len(grasps)):

@@ -27,13 +27,33 @@ RENDER = False
 #SlideCIP: handle is 51
 
 ELEMENT_IDS = {
-    'DoorCIP': [8, 42, 43, 44, 45, 46]
+    'DoorCIP': [46],
+    'DrawerCIP': [121],
+    'LeverCIP': [51],
+    'SlideCIP': [51],
 }
 
 def vertical_flip(img):
     return np.flip(img, axis=0)
 
-def task2handlePC(env, pointcloud_cameras, task, path, debug=True):
+def get_task_element_ids(env, task_name, segment):
+
+    # maybe just return handle ID 
+    if segment:
+        return ELEMENT_IDS[task_name]
+
+    # else get all geoms with name associated with task 
+    obj_name = task_name[:3]
+    task_elements = []
+    for geom in range(len(env.sim.model.geom_type)):
+        name = env.sim.model.geom_id2name(geom) 
+        if obj_name in name:
+            task_elements.append(geom)
+            print(name)
+    return task_elements
+
+
+def task2handlePC(env, pointcloud_cameras, task_elements, debug=True):
     obs = env.reset() #Get the raw reset observation from robosuite
     obj_pose = env.get_obj_pose()
 
@@ -53,11 +73,6 @@ def task2handlePC(env, pointcloud_cameras, task, path, debug=True):
             axarr[1].imshow(depth_image)
             axarr[2].imshow(segmentation_image)
             plt.show()
-
-        #make a mask for the graspable part of object based on element id
-        task_elements = ELEMENT_IDS[task]
-        for element in task_elements:
-            print(env.sim.model.geom_id2name(element))
 
         all_masked_segmentation = np.where(segmentation_image == task_elements, 1.0, -1.0)
         masked_segmentation = np.max(all_masked_segmentation, axis=-1).reshape(segmentation_image.shape)
@@ -119,9 +134,7 @@ def task2handlePC(env, pointcloud_cameras, task, path, debug=True):
     if (len(masked_pcd_list) == 1):
         complete_masked_pcd = masked_pcd_list[0]
 
-    o3d.io.write_point_cloud(f"{path}/{task}.ply", complete_masked_pcd)
-    np.save(f"{path}/{task}_pose.npy", obj_pose)
-
+    return complete_masked_pcd, obj_pose
 
 if __name__ == "__main__":
 
@@ -131,9 +144,9 @@ if __name__ == "__main__":
 
     parser.add_argument("--seed", default=0, help="seed",
                         type=int)  # Sets Gym, PyTorch and Numpy seeds
-    parser.add_argument("--path", default="./pointclouds/", type=str, help="location to save point clouds")
+    parser.add_argument("--path", default="./affordances/grasping/pointclouds/", type=str, help="location to save point clouds")
     parser.add_argument('-c','--cameras', nargs='+', default=["birdview","frontview","agentview","sideview"], help='list of cameras to use')
-
+    parser.add_argument('--seg', action="store_true", help="segment pointcloud for handle only?")
     args = parser.parse_args()
     print(args)
     pointcloud_cameras = args.cameras
@@ -162,6 +175,19 @@ if __name__ == "__main__":
         camera_depths=True
     )
     raw_env.deterministic_reset = True 
-    task2handlePC(raw_env, pointcloud_cameras, args.task, args.path) 
+
+    task_elements = get_task_element_ids(raw_env, args.task, args.seg)
+    complete_masked_pcd, obj_pose = task2handlePC(raw_env, pointcloud_cameras, task_elements) 
+
+    if args.seg: 
+        pcd_fname = f"{args.path}/{args.task}_seg.ply"
+        pose_fname = f"{args.path}/{args.task}_pose_seg.npy"
+    else:
+        pcd_fname = f"{args.path}/{args.task}.ply"
+        pose_fname = f"{args.path}/{args.task}_pose.npy"
+        
+    o3d.io.write_point_cloud(pcd_fname, complete_masked_pcd)
+    np.save(pose_fname, obj_pose)
+
 
 
