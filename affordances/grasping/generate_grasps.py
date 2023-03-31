@@ -3,6 +3,8 @@ import time
 import argparse 
 import sys 
 import copy
+import random
+import pickle 
 
 import numpy as np
 import torch
@@ -16,6 +18,10 @@ plt.close()
 import robosuite as suite
 from robosuite.utils import camera_utils
 from robosuite.controllers import load_controller_config
+
+from affordances.grasping.GraspSelector import GraspSelector
+import affordances.grasping.grasp_pose_generator as gpg
+from affordances.utils import utils
 
 
 RENDER = False
@@ -144,11 +150,15 @@ if __name__ == "__main__":
 
     parser.add_argument("--seed", default=0, help="seed",
                         type=int)  # Sets Gym, PyTorch and Numpy seeds
+    parser.add_argument('-n', '--num_samples', type=int, required=True)
     parser.add_argument("--path", default="./affordances/grasping/pointclouds/", type=str, help="location to save point clouds")
+    parser.add_argument('--output', type=str, default="affordances/domains/grasps")
     parser.add_argument('-c','--cameras', nargs='+', default=["birdview","frontview","agentview","sideview"], help='list of cameras to use')
     parser.add_argument('--seg', action="store_true", help="segment pointcloud for handle only?")
+
     args = parser.parse_args()
     print(args)
+    utils.set_random_seed(args.seed)
     pointcloud_cameras = args.cameras
 
     # create environment instance
@@ -177,7 +187,7 @@ if __name__ == "__main__":
     raw_env.deterministic_reset = True 
 
     task_elements = get_task_element_ids(raw_env, args.task, args.seg)
-    complete_masked_pcd, obj_pose = task2handlePC(raw_env, pointcloud_cameras, task_elements) 
+    test_cloud_with_normals, obj_pose = task2handlePC(raw_env, pointcloud_cameras, task_elements) 
 
     if args.seg: 
         pcd_fname = f"{args.path}/{args.task}_seg.ply"
@@ -185,9 +195,24 @@ if __name__ == "__main__":
     else:
         pcd_fname = f"{args.path}/{args.task}.ply"
         pose_fname = f"{args.path}/{args.task}_pose.npy"
-        
-    o3d.io.write_point_cloud(pcd_fname, complete_masked_pcd)
+
+    o3d.io.write_point_cloud(pcd_fname, test_cloud_with_normals)
     np.save(pose_fname, obj_pose)
 
+    # compute the grasps 
+    visualize = False
+
+    world_frame_axes = o3d.geometry.TriangleMesh.create_coordinate_frame()
+    if visualize:
+        o3d.visualization.draw_geometries([test_cloud_with_normals, world_frame_axes])
+    assert(np.asarray(test_cloud_with_normals.normals).shape == np.asarray(test_cloud_with_normals.points).shape)
+
+    gs = GraspSelector(obj_pose, test_cloud_with_normals)
+    sampled_poses = gs.getRankedGraspPoses()
+    random.shuffle(sampled_poses)
+    desired_sampled_poses = sampled_poses[:args.num_samples]
+    desired_sampled_poses = [gpg.translateFrameNegativeZ(p, gs.dist_from_point_to_ee_link) for p in desired_sampled_poses]
+    pickle.dump(desired_sampled_poses, open(f"{args.output}/{args.task}.pkl","wb"))
+    gs.visualizeGraspPoses(desired_sampled_poses)
 
 
