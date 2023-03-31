@@ -162,6 +162,13 @@ class Option:
 
       final_state = transitions[-1][-2]
       final_info = transitions[-1][-1]
+
+      # TODO(ab): Hack - removing keys to not distract goal option's rf
+      if self._option_idx <= 1:
+        assert isinstance(final_info, dict)
+        final_info.pop('has_key')
+        final_info.pop('door_open')
+
       self.effect_set.append((final_state, final_info))
 
     self.update_option_params(transitions, goal, goal_info)
