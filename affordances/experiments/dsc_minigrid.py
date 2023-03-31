@@ -9,11 +9,21 @@ from affordances.agent.dsc.option import Option
 from affordances.utils import plotting as plotting_utils
 from affordances.domains.minigrid import environment_builder, determine_goal_pos
 from affordances.goal_attainment.attainment_classifier import DiscreteInfoAttainmentClassifier
+from affordances.goal_attainment.attainment_classifier import MultiKeyDiscreteInfoAttainmentClassifier
+
+
+def create_goal_achievement_classifier(env_name):
+  # TODO(ab): Need some way to automate this
+  if 'doorkey' in env_name.lower():
+    print('[DSC-Minigrid] Using MultiKey GoalAchievement Function')
+    return MultiKeyDiscreteInfoAttainmentClassifier(
+    key_names=['player_pos', 'is_door_open', 'has_key'])
+  print('[DSC-Minigrid] Using SingleKey GoalAchievement Function')
+  return DiscreteInfoAttainmentClassifier(key_name='player_pos')
 
 
 def create_agent(env, s0, i0, goal_info):
-  goal_attainment_classifier = DiscreteInfoAttainmentClassifier(
-    key_name='player_pos')
+  goal_attainment_classifier = create_goal_achievement_classifier(args.environment_name)
   task_goal_classifier = lambda info: goal_attainment_classifier(info, goal_info)
   start_state_classifier = lambda info: goal_attainment_classifier(info, i0)
 
@@ -134,9 +144,11 @@ if __name__ == '__main__':
   parser.add_argument('--plot_dir', type=str, default='/gpfs/data/gdk/abagaria/affordances_plots')
   parser.add_argument('--exploration_bonus_scale', default=0, type=float)
   parser.add_argument('--epsilon_decay_steps', type=int, default=25_000)
+  parser.add_argument('--final_epsilon', type=float, default=0.1)
   parser.add_argument('--use_random_resets', action='store_true', default=False)
   parser.add_argument('--use_her_for_policy_evaluation', action='store_true', default=False)
   parser.add_argument('--n_actions', type=int, help='Specify the number of actions in the env')
+  parser.add_argument('--max_env_steps', type=int, default=-1, help='steps/episode')
   args = parser.parse_args()
 
   g_log_dir = os.path.join(args.log_dir, args.experiment_name, args.sub_dir)
@@ -158,7 +170,8 @@ if __name__ == '__main__':
     level_name=args.environment_name,
     seed=args.seed,
     exploration_reward_scale=0,
-    random_reset=args.use_random_resets
+    random_reset=args.use_random_resets,
+    max_steps=args.max_env_steps
   )
   
   # Assuming that env.env corresponds to the InfoWrapper
