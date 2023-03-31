@@ -24,7 +24,7 @@ class Rainbow:
     self.q_func = DistributionalDuelingDQN(n_actions, n_atoms, v_min, v_max, n_input_channels=n_channels)
     pnn.to_factorized_noisy(self.q_func, sigma_scale=noisy_net_sigma)
 
-    if epsilon_decay_steps is None and final_epsilon is not None:
+    if epsilon_decay_steps in (None, 0) and final_epsilon is not None:
       explorer = explorers.ConstantEpsilonGreedy(
         epsilon=final_epsilon,
         random_action_func=lambda: random.randint(0, n_actions - 1)
