@@ -31,6 +31,7 @@ class DSCAgent:
     n_actions: int | None = None,
     optimistic_threshold: float = 0.50,
     pessimistic_threshold: float = 0.75,
+    final_epsilon: float = 0.1
   ):
 
     self._env = env
@@ -64,7 +65,8 @@ class DSCAgent:
 
     self.uvfa_policy = self.create_uvfa_policy(
       env_steps=env_steps,
-      epsilon_decay_steps=epsilon_decay_steps
+      epsilon_decay_steps=epsilon_decay_steps,
+      final_eps=final_epsilon
     )
 
     self.initiation_gvf = self.create_initiation_learner()
@@ -205,7 +207,7 @@ class DSCAgent:
       parent_initiation_classifier=self.task_goal_classifier,
       use_weighted_classifiers=self._init_classifier_type=="weighted-binary")
 
-  def create_uvfa_policy(self, env_steps, epsilon_decay_steps):
+  def create_uvfa_policy(self, env_steps, epsilon_decay_steps, final_eps):
     kwargs = dict(
       n_atoms=51, v_max=10., v_min=-10.,
       noisy_net_sigma=0.5,
@@ -216,7 +218,7 @@ class DSCAgent:
       replay_buffer_size=int(3e5),
       gpu=self._gpu, n_obs_channels=2*self._n_input_channels,
       use_custom_batch_states=False,
-      final_epsilon=0.1,
+      final_epsilon=final_eps,
       epsilon_decay_steps=epsilon_decay_steps
     )
     return Rainbow(self._n_actions, **kwargs)
