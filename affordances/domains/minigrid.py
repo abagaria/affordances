@@ -1,4 +1,5 @@
 import math
+import ipdb
 import pickle
 import numpy as np
 from PIL import Image
@@ -30,13 +31,17 @@ class MinigridInfoWrapper(Wrapper):
     return obs, reward, done, info
 
   def _modify_info_dict(self, info, terminated=False, truncated=False):
-    info['player_pos'] = self.env.agent_pos
+    info['player_pos'] = tuple(self.env.agent_pos)
     info['player_x'] = self.env.agent_pos[0]
     info['player_y'] = self.env.agent_pos[1]
     info['truncated'] = truncated
     info['terminated'] = terminated
     info['needs_reset'] = truncated  # pfrl needs this flag
     info['timestep'] = self._timestep # total number of timesteps in env
+    info['has_key'] = self.env.unwrapped.carrying is not None
+    if info['has_key']:
+      assert self.unwrapped.carrying.type == 'key', self.env.unwrapped.carrying
+    info['door_open'] = determine_is_door_open(self)
     return info
 
 
@@ -147,6 +152,16 @@ def determine_goal_pos(env):
       tile = env.grid.get(i, j)
       if isinstance(tile, Goal):
           return i, j
+      
+
+def determine_is_door_open(env):
+  """Convinence hacky function to determine the goal location."""
+  from minigrid.core.world_object import Door
+  for i in range(env.grid.width):
+    for j in range(env.grid.height):
+      tile = env.grid.get(i, j)
+      if isinstance(tile, Door):
+        return tile.is_open
 
 
 def environment_builder(
@@ -157,8 +172,12 @@ def environment_builder(
   exploration_reward_scale=0,
   seed=42,
   random_reset=False,
+  max_steps=None,
 ):
-  env = gym.make(level_name)  #, goal_pos=(11, 11))
+  if max_steps is not None and max_steps > 0:
+    env = gym.make(level_name, max_steps=max_steps)  #, goal_pos=(11, 11))
+  else:
+    env = gym.make(level_name)
   env = ReseedWrapper(env, seeds=[seed])  # To fix the start-goal config
   env = RGBImgObsWrapper(env) # Get pixel observations
   env = ImgObsWrapper(env) # Get rid of the 'mission' field
