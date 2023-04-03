@@ -10,7 +10,7 @@ from gym import spaces
 import robosuite as suite
 from robosuite.controllers import load_controller_config
 
-def make_robosuite_env(task, deterministic=True, render=False, use_qpos_cache=False, pregrasp=True, optimal_ik=True, learning=True):
+def make_robosuite_env(task, deterministic=True, render=False, use_qpos_cache=False, pregrasp=True, optimal_ik=True, learning=True, segment=True):
     
     # create environment instance
     controller_config = load_controller_config(default_controller="OSC_POSE")
@@ -51,7 +51,8 @@ def make_robosuite_env(task, deterministic=True, render=False, use_qpos_cache=Fa
                            num_steps_lost_contact=500,
                            optimal_ik=optimal_ik,
                            control_gripper=True,
-                           use_qpos_cache=use_qpos_cache)
+                           use_qpos_cache=use_qpos_cache,
+                           segment=segment)
     return env 
 
 class Spec(object):
@@ -69,7 +70,8 @@ class RobotEnvWrapper(gym.ObservationWrapper):
                  num_steps_lost_contact=500,
                  optimal_ik=False,
                  control_gripper=False,
-                 use_qpos_cache=False):
+                 use_qpos_cache=False,
+                 segment=True):
 
         # setup action space 
         low_limits = env.action_spec[0]
@@ -96,6 +98,7 @@ class RobotEnvWrapper(gym.ObservationWrapper):
         self.control_gripper = control_gripper
         self.qpos_cache = {} 
         self.use_qpos_cache = use_qpos_cache
+        self.segment = segment
 
     def get_states_from_grasps(self):
         states = []
@@ -107,7 +110,12 @@ class RobotEnvWrapper(gym.ObservationWrapper):
     def load_grasps(self):
         task = self.env.__class__.__name__
         cur_dir = os.path.dirname(os.path.abspath(__file__))
-        heuristic_grasps_path = cur_dir + "/grasps/"+task+"_filtered.pkl"
+        
+        if self.segment:
+            heuristic_grasps_path = cur_dir + "/grasps/"+task+"_filtered_seg.pkl"
+        else:
+            heuristic_grasps_path = cur_dir + "/grasps/"+task+"_filtered.pkl"
+
         heuristic_grasps = pickle.load(open(heuristic_grasps_path,"rb"))
         grasp_list, self.grasp_wp_scores, self.grasp_qpos_list = list(zip(*heuristic_grasps))
         grasp_list = np.array(grasp_list)
@@ -228,9 +236,9 @@ if __name__ == '__main__':
     from affordances.utils import utils
     utils.set_random_seed(0)
 
-    # env = make_robosuite_env("DoorCIP", render=True)
+    env = make_robosuite_env("DoorCIP", render=True, segment=True)
     # env = make_robosuite_env("LeverCIP", render=True)
-    env = make_robosuite_env("SlideCIP", render=True)
+    # env = make_robosuite_env("SlideCIP", render=True)
     # env = make_robosuite_env("DrawerCIP", render=True)
     grasps = env.load_grasps()
     for i in range(len(grasps)):

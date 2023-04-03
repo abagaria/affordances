@@ -107,6 +107,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('-t', '--task',   required=True, type=str, 
                         help='name of task. DrawerCIP, DoorCIP, ...')
+    parser.add_argument('-n', type=int, required=True)
+    parser.add_argument('--seg', action="store_true", help="segment pointcloud for handle only?")
+
     args = parser.parse_args()
     print(args)
 
@@ -122,10 +125,16 @@ if __name__ == "__main__":
     )
     env.set_render(RENDER)
 
-    heuristic_grasps_path = "./affordances/domains/grasps/"+args.task+".pkl"
-    heuristic_grasps_filtered_path = "./affordances/domains/grasps/"+args.task+"_filtered.pkl"
-    heuristic_grasps = pickle.load(open(heuristic_grasps_path,"rb"))
-    reference_obj_pose = np.load(f"./affordances/grasping/pointclouds/{args.task}_pose.npy")
+    if args.seg:
+        heuristic_grasps_path = "./affordances/domains/grasps/"+args.task+"_seg.pkl"
+        heuristic_grasps_filtered_path = "./affordances/domains/grasps/"+args.task+"_filtered_seg.pkl"
+        heuristic_grasps = pickle.load(open(heuristic_grasps_path,"rb"))
+        reference_obj_pose = np.load(f"./affordances/grasping/pointclouds/{args.task}_pose_seg.npy")
+    else:
+        heuristic_grasps_path = "./affordances/domains/grasps/"+args.task+".pkl"
+        heuristic_grasps_filtered_path = "./affordances/domains/grasps/"+args.task+"_filtered.pkl"
+        heuristic_grasps = pickle.load(open(heuristic_grasps_path,"rb"))
+        reference_obj_pose = np.load(f"./affordances/grasping/pointclouds/{args.task}_pose.npy")
 
     good_grasps = []
     print("Number of heuristic grasps: {num}".format(num=len(heuristic_grasps)))
@@ -211,16 +220,21 @@ if __name__ == "__main__":
 
         good_grasps.append([try_grasp_obj_frame, cur_grasp_wp_list, cur_grasp_qpos_list])
 
+        if len(good_grasps) >= args.n:
+            break
+
+    assert len(good_grasps) >= args.n, f"only got {len(good_grasps)} grasps"
+    print(len(good_grasps))
     pickle.dump(good_grasps, open(heuristic_grasps_filtered_path,"wb"))
-    wp_vals, wp_results, wp_colors = list(zip(*wp_list))
 
     #red: IK infeasible or in collision
     #blue: joint violation after closing gripper
     #orange: lost contact after gripping
     #green: all good!
-    print("Total successful grasps:{good_grasps}".format(good_grasps=float(len(good_grasps))))
-    print("Fraction of successful grasps:{frac}".format(frac=float(len(good_grasps))/len(heuristic_grasps)))
-    if RENDER:
-        plt.scatter(wp_vals,wp_results,c=wp_colors)
-        plt.show()
+    # wp_vals, wp_results, wp_colors = list(zip(*wp_list))
+    # print("Total successful grasps:{good_grasps}".format(good_grasps=float(len(good_grasps))))
+    # print("Fraction of successful grasps:{frac}".format(frac=float(len(good_grasps))/len(heuristic_grasps)))
+    # if RENDER:
+    #     plt.scatter(wp_vals,wp_results,c=wp_colors)
+    #     plt.show()
 
