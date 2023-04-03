@@ -152,7 +152,7 @@ if __name__ == "__main__":
                         type=int)  # Sets Gym, PyTorch and Numpy seeds
     parser.add_argument('-n', '--num_samples', type=int, required=True)
     parser.add_argument("--path", default="./affordances/grasping/pointclouds/", type=str, help="location to save point clouds")
-    parser.add_argument('--output', type=str, default="affordances/domains/grasps")
+    parser.add_argument('--output', type=str, default="./affordances/domains/grasps")
     parser.add_argument('-c','--cameras', nargs='+', default=["birdview","frontview","agentview","sideview"], help='list of cameras to use')
     parser.add_argument('--seg', action="store_true", help="segment pointcloud for handle only?")
 
@@ -212,7 +212,13 @@ if __name__ == "__main__":
     random.shuffle(sampled_poses)
     desired_sampled_poses = sampled_poses[:args.num_samples]
     desired_sampled_poses = [gpg.translateFrameNegativeZ(p, gs.dist_from_point_to_ee_link) for p in desired_sampled_poses]
-    pickle.dump(desired_sampled_poses, open(f"{args.output}/{args.task}.pkl","wb"))
-    gs.visualizeGraspPoses(desired_sampled_poses)
+
+    if args.seg: 
+        grasp_fname = f"{args.output}/{args.task}_seg.pkl"
+    else:
+        grasp_fname = f"{args.output}/{args.task}.pkl"
+        
+    pickle.dump(desired_sampled_poses, open(grasp_fname,"wb"))
+    # gs.visualizeGraspPoses(desired_sampled_poses)
 
 
