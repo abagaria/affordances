@@ -53,6 +53,10 @@ class IkflowSolver:
         self.ndofs = robot_model.ndofs
         self.robot_model = robot_model
 
+        self.device = torch.device('cuda' if torch.cuda.is_available() else "cpu")
+        self.lower = torch.tensor([l[0] for l in self.robot_model.actuated_joints_limits]).to(self.device) + 1e-6
+        self.upper = torch.tensor([l[1] for l in self.robot_model.actuated_joints_limits]).to(self.device) - 1e-6
+
     def refine_solutions(
         self,
         ikflow_solutions: torch.Tensor,
@@ -67,7 +71,7 @@ class IkflowSolver:
                                                             [x, y, z, q0, q1, q2, q3] or be a [batch x 7] numpy array
         Returns:
             torch.Tensor: A batch of IK refined solutions [batch x ndofs]
-        """
+        """        
         t0 = time()
         b = ikflow_solutions.shape[0]
         if isinstance(target_pose, list):
@@ -75,6 +79,7 @@ class IkflowSolver:
         if isinstance(target_pose, np.ndarray) and len(target_pose.shape) == 2:
             assert target_pose.shape[0] == b, f"target_pose.shape ({target_pose.shape[0]}) != [{b} x {self.ndofs}]"
 
+        ikflow_solutions = torch.clamp(ikflow_solutions, self.lower, self.upper)
         ikflow_solutions_np = ikflow_solutions.detach().cpu().numpy()
         refined = ikflow_solutions_np.copy()
         is_single_pose = (len(target_pose.shape) == 1) or (target_pose.shape[0] == 1)
