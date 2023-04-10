@@ -7,6 +7,12 @@ import pickle
 import itertools
 import numpy as np
 
+def boolify(s):
+  if s == 'True':
+    return True
+  if s == 'False':
+    return False
+  raise ValueError("String '{}' is not a known bool value.".format(s))
 
 def rand_argmax(x):
   """A random tie-breaking argmax."""
