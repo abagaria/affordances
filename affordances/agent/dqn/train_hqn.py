@@ -18,6 +18,8 @@ from gym_montezuma.envs.montezuma_env import make_monte_env_as_atari_deepmind
 
 import affordances.agent.dqn.runloops as runloops
 from affordances.agent.dqn.hddqn import HierarchicalDoubleDQN
+from affordances.agent.dqn.utils import RandomizeAction
+from gym_montezuma.envs.errors import SkillRanTooLong
 
 
 class StateEnv(gym.Wrapper):
@@ -28,8 +30,13 @@ class StateEnv(gym.Wrapper):
             return self.env.env.env.env.env.env._state
     
     def step(self, action):
-        obs, reward, done, _ = self.env.step(action)
-        return obs, reward, done, self.get_current_state()
+        obs, reward, done, info = self.env.step(action)
+        state_dict = self.get_current_state()
+        if info.get('needs_reset', False):
+            state_dict.update({'needs_reset': True})
+        del info
+        state_dict.pop('env')
+        return obs, reward, done, state_dict
     
     def reset(self):
         obs0 = super().reset()
@@ -178,7 +185,7 @@ if __name__ == "__main__":
         env = StateEnv(env)
         if test:
             # Randomize actions like epsilon-greedy in evaluation as well
-            env = pfrl.wrappers.RandomizeAction(env, args.eval_epsilon)
+            env = RandomizeAction(env, args.eval_epsilon)
         env.seed(seed)
         return env 
 
