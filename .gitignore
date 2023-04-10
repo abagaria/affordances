@@ -136,3 +136,5 @@ profile.json
 profile.html
 .onager/*
 settings.json
+*.txt
+*.pt
