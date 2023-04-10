@@ -116,7 +116,7 @@ if __name__ == '__main__':
   parser.add_argument('--gpu', type=int, default=0)
   parser.add_argument('--environment_name', type=str, default='MiniGrid-Empty-8x8-v0')
   parser.add_argument('--n_episodes', type=int, default=500)
-  parser.add_argument('--lr', type=float, default=1e-4)
+  parser.add_argument('--lr', type=float, default=3e-4)
   parser.add_argument('--sigma', type=float, default=0.05)
   parser.add_argument('--log_dir', type=str, default='/gpfs/data/gdk/abagaria/affordances_logs')
   parser.add_argument('--sampler', type=str, default='soft')
