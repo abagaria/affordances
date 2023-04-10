@@ -15,11 +15,11 @@ class TD3:
     obs_size = obs_space.low.size
 
     policy = nn.Sequential(
-        nn.Linear(obs_size, 400),
+        nn.Linear(obs_size, 256),
         nn.ReLU(),
-        nn.Linear(400, 300),
+        nn.Linear(256, 256),
         nn.ReLU(),
-        nn.Linear(300, action_size),
+        nn.Linear(256, action_size),
         nn.Tanh(),
         pfrl.policies.DeterministicHead(),
     )
@@ -28,11 +28,11 @@ class TD3:
     def make_q_func_with_optimizer():
         q_func = nn.Sequential(
             pfrl.nn.ConcatObsAndAction(),
-            nn.Linear(obs_size + action_size, 400),
+            nn.Linear(obs_size + action_size, 256),
             nn.ReLU(),
-            nn.Linear(400, 300),
+            nn.Linear(256, 256),
             nn.ReLU(),
-            nn.Linear(300, 1),
+            nn.Linear(256, 1),
         )
         q_func_optimizer = torch.optim.Adam(q_func.parameters(), lr)
         return q_func, q_func_optimizer
