@@ -10,7 +10,14 @@ from gym import spaces
 import robosuite as suite
 from robosuite.controllers import load_controller_config
 
-def make_robosuite_env(task, deterministic=True, render=False, use_qpos_cache=False, pregrasp=True, optimal_ik=True, learning=True, segment=True):
+def make_robosuite_env(task, 
+    deterministic=True, 
+    render=False, 
+    use_qpos_cache=False, 
+    pregrasp=True, 
+    optimal_ik=True, 
+    learning=True, 
+    segment=True):
     
     # create environment instance
     controller_config = load_controller_config(default_controller="OSC_POSE")
@@ -236,10 +243,10 @@ if __name__ == '__main__':
     from affordances.utils import utils
     utils.set_random_seed(0)
 
-    env = make_robosuite_env("DoorCIP", render=True, segment=True)
+    # env = make_robosuite_env("DoorCIP", render=True, segment=True)
     # env = make_robosuite_env("LeverCIP", render=True)
-    # env = make_robosuite_env("SlideCIP", render=True)
-    # env = make_robosuite_env("DrawerCIP", render=True)
+    env = make_robosuite_env("SlideCIP", render=True)
+    # env = make_robosuite_env("DrawerCIP", render=True, segment=True)
     grasps = env.load_grasps()
     for i in range(len(grasps)):
         print(i % len(grasps))

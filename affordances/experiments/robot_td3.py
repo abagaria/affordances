@@ -121,6 +121,8 @@ if __name__ == '__main__':
   parser.add_argument('--log_dir', type=str, default='/gpfs/data/gdk/abagaria/affordances_logs')
   parser.add_argument('--sampler', type=str, default='soft')
   parser.add_argument('--init_learner', type=str, default='binary')
+  parser.add_argument('--optimal_ik', type=utils.boolify, default=True)
+  parser.add_argument('--segment', type=utils.boolify, default=True)
   args = parser.parse_args()
 
   g_log_dir = os.path.join(args.log_dir, args.experiment_name, args.sub_dir)
@@ -137,7 +139,14 @@ if __name__ == '__main__':
   run_dict_file = os.path.join(g_log_dir, "config.pkl")
   utils.safe_zip_write(run_dict_file, run_dict)
 
-  env = make_robosuite_env(args.environment_name, deterministic=True, render=False, use_qpos_cache=True)
+  env = make_robosuite_env(
+    args.environment_name, 
+    deterministic=True, 
+    render=False, 
+    use_qpos_cache=True,
+    optimal_ik=args.optimal_ik,
+    segment=args.segment
+  )
   td3_agent = create_agent(
     env.action_space, 
     env.observation_space,
