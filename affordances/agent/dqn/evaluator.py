@@ -33,7 +33,6 @@ def _run_episodes(
             done = False
             test_r = 0
             episode_len = 0
-            info = {}
         a = agent.act(obs, info)
         obs, r, done, info = env.step(a)
         test_r += r
@@ -120,7 +119,7 @@ def _batch_run_episodes(
     episode_r = np.zeros(num_envs, dtype=np.float64)
     episode_len = np.zeros(num_envs, dtype="i")
 
-    obss = env.reset()
+    obss, infos = env.reset()
     rs = np.zeros(num_envs, dtype="f")
 
     termination_conditions = False
@@ -204,7 +203,7 @@ def _batch_run_episodes(
         if termination_conditions:
             break
         else:
-            obss = env.reset(not_end)
+            obss, infos = env.reset(not_end)
 
     for i, (epi_len, epi_ret) in enumerate(
         zip(eval_episode_lens, eval_episode_returns)

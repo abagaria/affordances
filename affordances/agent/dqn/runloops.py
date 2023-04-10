@@ -4,7 +4,8 @@ from collections import deque
 
 import numpy as np
 
-from pfrl.experiments.evaluator import Evaluator, save_agent
+from pfrl.experiments.evaluator import save_agent
+from affordances.agent.dqn.evaluator import Evaluator
 
 
 def train_agent_batch(
