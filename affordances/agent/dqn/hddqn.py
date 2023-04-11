@@ -14,9 +14,16 @@ class HierarchicalDoubleDQN(DoubleDQN):
     def __init__(self, env, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._env = env  # env with options
+
+        # f: s, o -> bool
+        self._init_fn = env.can_execute_action
+
+    # Uncomment if using MontezumasRevenge    
+    # def get_option_mask(self, state: dict) -> np.ndarray:
+    #     return np.asarray([o.can_run(state) for o in self._env.options])
     
     def get_option_mask(self, state: dict) -> np.ndarray:
-        return np.asarray([o.can_run(state) for o in self._env.options])
+        return np.asarray([self._init_fn(state, o) for o in self._env.options])
 
     def act(self, obs, info):
         return self.batch_act([obs], [info])[0]

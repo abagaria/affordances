@@ -14,34 +14,11 @@ from pfrl import nn as pnn
 from pfrl import replay_buffers, utils
 from pfrl.initializers import init_chainer_default
 from pfrl.q_functions import DiscreteActionValueHead, DuelingDQN
-from gym_montezuma.envs.montezuma_env import make_monte_env_as_atari_deepmind
 
 import affordances.agent.dqn.runloops as runloops
+import affordances.agent.dqn.wrappers as wrappers
 from affordances.agent.dqn.hddqn import HierarchicalDoubleDQN
 from affordances.agent.dqn.utils import RandomizeAction
-from gym_montezuma.envs.errors import SkillRanTooLong
-
-
-class StateEnv(gym.Wrapper):
-    def get_current_state(self):
-        try:  # TODO: come on
-            return self.env.env.env.env.env._state
-        except:
-            return self.env.env.env.env.env.env._state
-    
-    def step(self, action):
-        obs, reward, done, info = self.env.step(action)
-        state_dict = self.get_current_state()
-        if info.get('needs_reset', False):
-            state_dict.update({'needs_reset': True})
-        del info
-        state_dict.pop('env')
-        return obs, reward, done, state_dict
-    
-    def reset(self):
-        obs0 = super().reset()
-        s0 = self.get_current_state()
-        return obs0, s0
 
 
 class SingleSharedBias(nn.Module):
@@ -84,6 +61,18 @@ def parse_arch(arch, n_actions):
         )
     elif arch == "dueling":
         return DuelingDQN(n_actions)
+    elif arch == "visgrid84":
+        return nn.Sequential(
+            pnn.SmallAtariCNN(n_input_channels=1),
+            init_chainer_default(nn.Linear(256, n_actions)),
+            DiscreteActionValueHead(),
+        )
+    elif arch == 'visgrid64':
+        return nn.Sequential(
+            pnn.SmallAtariCNN(n_input_channels=1, n_linear_inputs=1152),
+            init_chainer_default(nn.Linear(256, n_actions)),
+            DiscreteActionValueHead(),
+        )
     else:
         raise RuntimeError("Not supported architecture: {}".format(arch))
 
@@ -112,7 +101,7 @@ if __name__ == "__main__":
         "--arch",
         type=str,
         default="doubledqn",
-        choices=["nature", "nips", "dueling", "doubledqn"],
+        choices=["nature", "nips", "dueling", "doubledqn", "visgrid64", "visgrid84"],
     )
     parser.add_argument("--steps", type=int, default=5 * 10**7)
     parser.add_argument(
@@ -160,6 +149,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--num-envs", type=int, default=1)
     parser.add_argument("--n-step-return", type=int, default=1)
+    parser.add_argument("--use_random_maze", action="store_true", default=False)
     args = parser.parse_args()
 
     import logging
@@ -172,7 +162,8 @@ if __name__ == "__main__":
     args.outdir = experiments.prepare_output_dir(args, args.outdir)
     print("Output files are saved in {}".format(args.outdir))
 
-    def make_env(seed, test):
+    def make_montezuma(seed, test):
+        from gym_montezuma.envs.montezuma_env import make_monte_env_as_atari_deepmind
         env = make_monte_env_as_atari_deepmind(
             max_episode_steps=4000,
             episode_life=False,
@@ -182,15 +173,20 @@ if __name__ == "__main__":
             frame_warp=(84,84),
             render_option_execution=False
         )
-        env = StateEnv(env)
+        env = wrappers.MontezumaWrapper(env)
         if test:
             # Randomize actions like epsilon-greedy in evaluation as well
             env = RandomizeAction(env, args.eval_epsilon)
         env.seed(seed)
-        return env 
+        return env
 
-    train_env = make_env(0, test=False)
-    eval_env = make_env(1, test=True)
+    def make_gridworld(seed, test):
+        from affordances.domains.visgrid import environment_builder
+        return environment_builder(use_random_maze=args.use_random_maze,
+                                   seed=seed, test=test) 
+
+    train_env = make_gridworld(args.seed, test=False)
+    eval_env = make_gridworld(args.seed, test=True)
 
     n_actions = train_env.action_space.n
     q_func = parse_arch(args.arch, n_actions)
@@ -234,8 +230,6 @@ if __name__ == "__main__":
     def phi(x):
         # Feature extractor
         return np.asarray(x, dtype=np.float32) / 255
-    
-    
 
     agent = HierarchicalDoubleDQN(
         q_function=q_func,
