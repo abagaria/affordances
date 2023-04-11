@@ -150,6 +150,7 @@ if __name__ == "__main__":
     parser.add_argument("--num-envs", type=int, default=1)
     parser.add_argument("--n-step-return", type=int, default=1)
     parser.add_argument("--use_random_maze", action="store_true", default=False)
+    parser.add_argument("--use_global_init_fn", action="store_true", default=False)
     args = parser.parse_args()
 
     import logging
@@ -195,6 +196,14 @@ if __name__ == "__main__":
         pnn.to_factorized_noisy(q_func, sigma_scale=args.noisy_net_sigma)
         # Turn off explorer
         explorer = explorers.Greedy()
+    else:
+        explorer = explorers.LinearDecayEpsilonGreedy(
+            1.0,
+            args.final_epsilon,
+            args.final_exploration_frames,
+            random_action_func=lambda: train_env.action_space.sample() \
+                if args.use_global_init_fn else train_env.sample_random_action(),
+        )
 
     # Use the same hyper parameters as the Nature paper's
     opt = optim.RMSprop(
@@ -220,13 +229,6 @@ if __name__ == "__main__":
     else:
         rbuf = replay_buffers.ReplayBuffer(10**6, num_steps=args.n_step_return)
 
-    explorer = explorers.LinearDecayEpsilonGreedy(
-        1.0,
-        args.final_epsilon,
-        args.final_exploration_frames,
-        lambda: train_env.action_space.sample(),
-    )
-
     def phi(x):
         # Feature extractor
         return np.asarray(x, dtype=np.float32) / 255
@@ -244,7 +246,8 @@ if __name__ == "__main__":
         update_interval=args.update_interval,
         batch_accumulator="sum",
         phi=phi,
-        env=train_env
+        env=train_env,
+        use_dummy_init_fn=args.use_global_init_fn,
     )
 
     if args.load:

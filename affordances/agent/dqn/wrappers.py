@@ -1,4 +1,5 @@
 import gym
+import random
 import numpy as np
 
 
@@ -33,6 +34,11 @@ class VisgridWrapper(gym.Wrapper):
         position = state['player_pos']
         direction = self.unwrapped._action_offsets[action]
         return not self.grid.has_wall(position, direction)
+    
+    def sample_random_action(self) -> int:
+        state = self.get_current_state()
+        actions = [a for a in self.options if self.can_execute_action(state, a)]
+        return random.choice(actions)
     
     def step(self, action):
         obs, reward, terminated, truncated, info = self.env.step(action)

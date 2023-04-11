@@ -11,12 +11,16 @@ from affordances.agent.dqn.utils import batch_experiences
 
 
 class HierarchicalDoubleDQN(DoubleDQN):
-    def __init__(self, env, *args, **kwargs):
+    def __init__(self, env, use_dummy_init_fn, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._env = env  # env with options
+        self._use_dummy_init_fn = use_dummy_init_fn
 
         # f: s, o -> bool
-        self._init_fn = env.can_execute_action
+        if use_dummy_init_fn:
+            self._init_fn = lambda s, o: True
+        else:
+            self._init_fn = env.can_execute_action
 
     # Uncomment if using MontezumasRevenge    
     # def get_option_mask(self, state: dict) -> np.ndarray:
