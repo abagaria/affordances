@@ -55,6 +55,8 @@ def train(agent: TD3, init_learner, sample_func, env, n_episodes):
   
   grasps = env.load_grasps()
   grasp_state_vectors = env.get_states_from_grasps()
+  print('-- got grasps --')
+
   grasp_counts = {}
   grasp_success = {}
   for i in range(len(grasps)):
@@ -62,6 +64,7 @@ def train(agent: TD3, init_learner, sample_func, env, n_episodes):
     grasp_success[i] = 0 
 
   for episode in range(n_episodes):
+    sys.stdout.flush()
     done = False
     episode_reward = 0.
 
@@ -124,6 +127,7 @@ if __name__ == '__main__':
   parser.add_argument('--optimal_ik', type=utils.boolify, default=True)
   parser.add_argument('--segment', type=utils.boolify, default=True)
   args = parser.parse_args()
+  print(args)
 
   g_log_dir = os.path.join(args.log_dir, args.experiment_name, args.sub_dir)
 
