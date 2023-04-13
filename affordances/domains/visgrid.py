@@ -38,7 +38,7 @@ def environment_builder(use_random_maze, seed, test, max_episode_steps=50):
     env = wrappers.Float2UInt8Wrapper(env)
     env = wrappers.UnsqueezeChannelWrapper(env)
     env = wrappers.VisgridWrapper(env)
-    env = pfrl.wrappers.ContinuingTimeLimit(
+    env = wrappers.ContinuingTimeLimit(
         env, max_episode_steps=max_episode_steps)
     
     return env
