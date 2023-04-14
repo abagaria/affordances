@@ -14,14 +14,16 @@ class ConvInitiationClassifier(InitiationClassifier):
     optimistic_threshold: float,
     pessimistic_threshold: float,
     n_input_channels: int = 1,
-    maxlen: int = 10
+    maxlen: int = 10,
+    image_dim : int = 84
   ):
     self.device = device
     self.optimistic_threshold = optimistic_threshold
     self.pessimistic_threshold = pessimistic_threshold
     self.n_input_channels = n_input_channels
     
-    self.classifier = ConvClassifier(device, None, n_input_channels)
+    self.classifier = ConvClassifier(
+      device, None, n_input_channels, image_dim=image_dim)
     
     super().__init__(max_n_trajectories=maxlen)
 

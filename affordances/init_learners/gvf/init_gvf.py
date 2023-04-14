@@ -21,7 +21,8 @@ class InitiationGVF(InitiationLearner):
       optimistic_threshold: float = 0.7,
       pessimistic_threshold: float = 0.8,
       use_prioritized_buffer: bool = True,
-      init_replay_capacity: int = 100_000):
+      init_replay_capacity: int = 100_000,
+      image_dim: int = 84):
     super().__init__()
     self._n_actions = n_actions
     self._n_input_channels = n_input_channels
@@ -39,7 +40,8 @@ class InitiationGVF(InitiationLearner):
     self.policy_evaluation_module = TDPolicyEvaluator(
       self.initiation_replay_buffer,
       n_actions=n_actions,
-      n_input_channels=n_input_channels
+      n_input_channels=n_input_channels,
+      image_dim=image_dim
     )
 
   def add_trajectory_to_replay(self, transitions):

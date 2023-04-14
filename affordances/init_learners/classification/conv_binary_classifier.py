@@ -10,11 +10,17 @@ from affordances.init_learners.gvf.init_gvf import GoalConditionedInitiationGVF
 
 
 class ImageCNN(torch.nn.Module):
-  def __init__(self, n_input_channels: int = 3):
+  def __init__(self, n_input_channels: int = 3, image_dim: int = 84):
     super().__init__()
-
+    if image_dim == 84:
+      torso = SmallAtariCNN(n_input_channels=n_input_channels,
+                                 n_output_channels=256)
+    else:
+      assert image_dim == 64, image_dim
+      torso = SmallAtariCNN(n_input_channels=n_input_channels,
+                                 n_output_channels=256, n_linear_inputs=1152)
     self.model = torch.nn.Sequential(
-      SmallAtariCNN(n_input_channels, n_output_channels=256),
+      torso,
       torch.nn.Linear(in_features=256, out_features=128),
       torch.nn.ReLU(),
       torch.nn.Linear(in_features=128, out_features=1)
@@ -32,14 +38,15 @@ class ConvClassifier:
         threshold=0.5,
         n_input_channels=1,
         batch_size=32,
-        lr=1e-3):
+        lr=1e-3,
+        image_dim=64):
     
     self.device = device
     self.is_trained = False
     self.threshold = threshold
     self.batch_size = batch_size
 
-    self.model = ImageCNN(n_input_channels).to(device)
+    self.model = ImageCNN(n_input_channels, image_dim).to(device)
     self.optimizer = torch.optim.Adam(self.model.parameters(), lr=lr)
 
     # Debug variables

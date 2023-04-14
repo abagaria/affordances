@@ -53,6 +53,7 @@ class Option:
         optimistic_threshold=0.5,
         pessimistic_threshold=0.75,
         n_input_channels=1,
+        image_dim=subgoal_obs.squeeze().shape[0]
       )
 
       self.subgoal_obs = subgoal_obs

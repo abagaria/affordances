@@ -138,3 +138,5 @@ profile.html
 settings.json
 *.txt
 *.pt
+*.pkl
+*.png

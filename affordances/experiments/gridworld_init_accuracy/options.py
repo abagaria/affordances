@@ -13,6 +13,7 @@ class AgentOverOptions:
     env,
     gestation_period,
     timeout,
+    image_dim: int,
     gpu: int = 0,
     n_input_channels: int = 1,
     env_steps: int = int(500_000),
@@ -24,6 +25,8 @@ class AgentOverOptions:
     self._gestation_period = gestation_period
     self._gpu = gpu
     self._n_input_channels = n_input_channels
+
+    self.image_dim = image_dim
     
     self.uvfa_policy = self.create_uvfa_policy(
       env_steps, epsilon_decay_steps, final_epsilon)
@@ -51,7 +54,8 @@ class AgentOverOptions:
       n_obs_channels=2*self._n_input_channels,
       use_custom_batch_states=False,
       final_epsilon=final_eps,
-      epsilon_decay_steps=epsilon_decay_steps
+      epsilon_decay_steps=epsilon_decay_steps,
+      image_dim=self.image_dim
     )
     return Rainbow(self._env.action_space.n, **kwargs)
   
@@ -62,7 +66,8 @@ class AgentOverOptions:
       n_actions=self._env.action_space.n,
       n_input_channels=2*self._n_input_channels,
       optimistic_threshold=0.5,
-      pessimistic_threshold=0.75  # don't need this
+      pessimistic_threshold=0.75,  # don't need this
+      image_dim=self.image_dim
     )
   
   def get_subgoal_positions_for_6x6_gridworld(self):
@@ -73,7 +78,7 @@ class AgentOverOptions:
  
   def get_subgoals(self):
     pos2goals = {}  # pos -> (obs, info)
-    subgoal_positions = self.get_subgoal_positions_for_6x6_gridworld()
+    subgoal_positions = self.get_subgoal_positions_for_13x13_gridworld()
     for pos in subgoal_positions:
       obs, info = self._env.reset(pos=pos)
       pos2goals[pos] = (obs, info)

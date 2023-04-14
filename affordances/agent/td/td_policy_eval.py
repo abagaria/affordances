@@ -15,11 +15,19 @@ from pfrl.replay_buffers.prioritized import PrioritizedReplayBuffer
 
 
 class QNetwork(torch.nn.Module):
-  def __init__(self, n_input_channels, n_actions):
+  def __init__(self, n_input_channels, n_actions, image_dim=84):
     super().__init__()
 
+    if image_dim == 84:
+      torso = SmallAtariCNN(n_input_channels=n_input_channels,
+                                 n_output_channels=256)
+    else:
+      assert image_dim == 64, image_dim
+      torso = SmallAtariCNN(n_input_channels=n_input_channels,
+                                 n_output_channels=256, n_linear_inputs=1152)
+
     self.model = torch.nn.Sequential(
-      SmallAtariCNN(n_input_channels=n_input_channels, n_output_channels=256),
+      torso,
       torch.nn.Linear(in_features=256, out_features=128),
       torch.nn.ReLU(),
       torch.nn.Linear(in_features=128, out_features=n_actions)
@@ -41,6 +49,7 @@ class TDPolicyEvaluator:
     batch_size: int = 32,
     gamma: float = 0.99,
     learning_rate: float = 1e-4,
+    image_dim : int = 84
   ):
     """Constructor for TD policy evaluation.
 
@@ -62,7 +71,7 @@ class TDPolicyEvaluator:
     self._learning_rate = learning_rate
     self._maintain_prioritized_buffer = isinstance(replay, PrioritizedReplayBuffer)
 
-    self._online_q_network = QNetwork(n_input_channels, n_actions)
+    self._online_q_network = QNetwork(n_input_channels, n_actions, image_dim)
     self._target_q_network = copy.deepcopy(self._online_q_network).eval().requires_grad_(False)
 
     self._n_updates = 0

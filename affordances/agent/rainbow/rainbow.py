@@ -15,13 +15,20 @@ class Rainbow:
          n_steps, betasteps, replay_start_size, replay_buffer_size, gpu,
          n_obs_channels, use_custom_batch_states=True,
          epsilon_decay_steps=None, final_epsilon=0.1,
-         update_interval: int = 4):
+         update_interval: int = 4, image_dim=84):
     self.n_actions = n_actions
     n_channels = n_obs_channels
     self.use_custom_batch_states = use_custom_batch_states
     self.update_interval = update_interval
 
-    self.q_func = DistributionalDuelingDQN(n_actions, n_atoms, v_min, v_max, n_input_channels=n_channels)
+    if image_dim != 84:
+      assert image_dim == 64, image_dim
+      self.q_func = DistributionalDuelingDQN(n_actions, n_atoms, v_min, v_max,
+                                           n_input_channels=n_channels,
+                                           n_linear_units=1024)
+    else:
+      self.q_func = DistributionalDuelingDQN(n_actions, n_atoms, v_min, v_max,
+                                            n_input_channels=n_channels)
     pnn.to_factorized_noisy(self.q_func, sigma_scale=noisy_net_sigma)
 
     if epsilon_decay_steps in (None, 0) and final_epsilon is not None:
