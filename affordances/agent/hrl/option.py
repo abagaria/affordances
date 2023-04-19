@@ -5,6 +5,8 @@ import random
 import numpy as np
 import collections
 
+from pfrl.wrappers import atari_wrappers
+
 from affordances.utils import utils
 from affordances.agent.rainbow.rainbow import Rainbow
 from affordances.init_learners.gvf.init_gvf import GoalConditionedInitiationGVF
@@ -53,7 +55,7 @@ class Option:
         optimistic_threshold=0.5,
         pessimistic_threshold=0.75,
         n_input_channels=1,
-        image_dim=subgoal_obs.squeeze().shape[0]
+        image_dim=subgoal_obs._frames[0].squeeze().shape[0]  # TODO
       )
 
       self.subgoal_obs = subgoal_obs
@@ -82,7 +84,7 @@ class Option:
     return self.termination_classifier(info)  # or info['terminated']
 
   def act(self, state, goal):
-    augmented_state = self.get_augmeted_state(state, goal)
+    augmented_state = self.get_augmented_state(state, goal)
     return self._solver.act(augmented_state)
 
   def rollout(self, env, state, info):
@@ -125,7 +127,7 @@ class Option:
     self.update_option_params(transitions, self.subgoal_obs, self.subgoal_info)
 
     if not self._is_global_option:
-      self.update_option_initiation_classifiers(transitions, success, self.subgoal_obs)
+      self.initiation_classifier.add_trajectory(transitions, success)
 
   def update_option_params(self, transitions, goal, goal_info):
     """Update the parameters of the UVFA and the initiation GVF."""
@@ -152,8 +154,8 @@ class Option:
     relabeled_trajectory = []
     bonus_scale = self._exploration_bonus_scale if add_bonus else 0
     for state, action, _, next_state, info in transitions:
-      sg = self.get_augmeted_state(state, goal)
-      nsg = self.get_augmeted_state(next_state, goal)
+      sg = self.get_augmented_state(state, goal)
+      nsg = self.get_augmented_state(next_state, goal)
       reached = self._goal_attainment_classifier(info, goal_info)
       reward = float(reached) + (bonus_scale * info['bonus'])
       relabeled_trajectory.append((sg, action, reward, nsg, reached, info))
@@ -176,17 +178,19 @@ class Option:
       return goal, goal_info
     raise NotImplementedError(method)
 
-  def update_option_initiation_classifiers(self, transitions, success, goal):
-    self.initiation_classifier.add_trajectory(transitions, success)
+  def update_option_initiation_classifiers(self):
+    """Perform SGD updates to the option's initiation classifier."""
     
     if self._use_weighted_classifiers:
-      self.initiation_classifier.update(self.initiation_gvf, goal)
+      self.initiation_classifier.update(self.initiation_gvf, self.subgoal_obs)
     else:
       self.initiation_classifier.update()
   
-  def get_augmeted_state(self, state, goal):
-    assert state.shape == (1, 84, 84) or state.shape == (1, 64, 64), state.shape
-    return np.concatenate((state, goal), axis=0)
+  def get_augmented_state(self, state, goal):
+    assert isinstance(goal, atari_wrappers.LazyFrames), type(goal)
+    assert isinstance(state, atari_wrappers.LazyFrames), type(state)
+    features = list(state._frames) + [goal._frames[-1]]
+    return atari_wrappers.LazyFrames(features, stack_axis=0)
   
   def log_progress(self, info, success, goal_info):
     self.debug_log['timesteps'].append(info['timestep'])
