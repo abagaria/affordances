@@ -1,5 +1,6 @@
 """Create options for visual gridworld."""
 
+import ipdb
 
 from affordances.agent.hrl.option import Option
 from affordances.agent.rainbow.rainbow import Rainbow
@@ -14,8 +15,10 @@ class AgentOverOptions:
     gestation_period,
     timeout,
     image_dim: int,
+    rams: list,
     gpu: int = 0,
-    n_input_channels: int = 1,
+    n_input_channels: int = 4,
+    n_goal_channels: int = 1,
     env_steps: int = int(500_000),
     epsilon_decay_steps: int = 25_000,
     final_epsilon: float = 0.1
@@ -25,6 +28,8 @@ class AgentOverOptions:
     self._gestation_period = gestation_period
     self._gpu = gpu
     self._n_input_channels = n_input_channels
+    self._n_goal_channels = n_goal_channels
+    self._rams = rams
 
     self.image_dim = image_dim
     
@@ -51,7 +56,7 @@ class AgentOverOptions:
       replay_start_size=1024, 
       replay_buffer_size=int(3e5),
       gpu=self._gpu,
-      n_obs_channels=2*self._n_input_channels,
+      n_obs_channels=self._n_input_channels + self._n_goal_channels,
       use_custom_batch_states=False,
       final_epsilon=final_eps,
       epsilon_decay_steps=epsilon_decay_steps,
@@ -64,7 +69,7 @@ class AgentOverOptions:
     return GoalConditionedInitiationGVF(
       target_policy=self.uvfa_policy.agent.batch_act,
       n_actions=self._env.action_space.n,
-      n_input_channels=2*self._n_input_channels,
+      n_input_channels=self._n_input_channels + self._n_goal_channels,
       optimistic_threshold=0.5,
       pessimistic_threshold=0.75,  # don't need this
       image_dim=self.image_dim
@@ -78,9 +83,9 @@ class AgentOverOptions:
  
   def get_subgoals(self):
     pos2goals = {}  # pos -> (obs, info)
-    subgoal_positions = self.get_subgoal_positions_for_13x13_gridworld()
-    for pos in subgoal_positions:
-      obs, info = self._env.reset(pos=pos)
+    for state_dict in self._rams:
+      pos = state_dict['player_pos']
+      obs, info = self._env.reset(ram=state_dict['ram'], state=state_dict['state'])
       pos2goals[pos] = (obs, info)
     return pos2goals
 
