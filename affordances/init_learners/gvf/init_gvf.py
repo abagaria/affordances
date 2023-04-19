@@ -100,6 +100,8 @@ class InitiationGVF(InitiationLearner):
 
 class GoalConditionedInitiationGVF(InitiationGVF):
   def get_values(self, states, goals):
+    if len(goals.shape) < len(states.shape):
+      goals = goals[:, np.newaxis, :, :]  # (N, 84, 84) -> (N, 1, 84, 84)
     augmented_states = np.concatenate((states, goals), axis=1)
     return self.policy_evaluation_module.get_values(augmented_states)
 

@@ -1,6 +1,6 @@
+import ipdb
 import torch
 import itertools
-import collections
 import numpy as np
 
 from affordances.utils import utils
@@ -28,6 +28,8 @@ class ConvInitiationClassifier(InitiationClassifier):
     super().__init__(max_n_trajectories=maxlen)
 
   def _predict(self, states: np.ndarray, threshold) -> np.ndarray:
+    # TODO: This converts lz -> np.array. Do this in one place.
+    states = [state._frames[-1] for state in states]  
     state_tensor = utils.tensorfy(states, self.device)
     preprocessed_tensor = state_tensor / 255.
     predictions = self.classifier.predict(preprocessed_tensor, threshold)

@@ -91,3 +91,11 @@ def softmax(scores, temperature):
   from scipy import special
   assert temperature > 0, temperature
   return special.softmax(scores / temperature)
+
+
+def show_frame_stack(lz_frames):
+  import matplotlib.pyplot as plt
+  for i, frame in enumerate(lz_frames._frames):
+    plt.subplot(2, 2, i+1)
+    plt.imshow(frame.squeeze())
+  plt.show()

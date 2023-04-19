@@ -18,7 +18,7 @@ def visualize_initiation_table(
       y.append(position[1])
       z.append(np.mean(init_table[position][str(option)]))
 
-    plt.subplot(2, 2, i+1)
+    plt.subplot(3, 2, i+1)
     plt.scatter(x, y, c=z)
     plt.colorbar()
     plt.title(f'{option} g={option.subgoal_info["player_pos"]}')

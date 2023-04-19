@@ -1,3 +1,4 @@
+import ipdb
 import torch
 import random
 import numpy as np
@@ -74,9 +75,9 @@ class ConvClassifier:
     init_gvf: GoalConditionedInitiationGVF,
     goal: np.ndarray
   ):
-    goals = np.repeat(goal[np.newaxis, ...], repeats=len(states), axis=0)
+    goals = np.repeat(goal._frames[-1], repeats=len(states), axis=0)
     assert isinstance(states, np.ndarray), 'Conversion done in TD(0)'
-    assert isinstance(goal, np.ndarray), 'Conversion done in TD(0)'
+    assert isinstance(goals, np.ndarray), 'Conversion done in TD(0)'
     assert states.dtype == goals.dtype == np.uint8, 'Preprocessing done in TD(0)'
     values = init_gvf.get_values(states, goals)
     values = utils.tensorfy(values, self.device)  # TODO(ab): keep these on GPU
@@ -91,12 +92,12 @@ class ConvClassifier:
     return enough_data and has_positives and has_negatives
 
   def preprocess_batch(self, X):
-    assert X.dtype == torch.uint8, X.dtype
-    return X.float() / 255.
+    # assert X.dtype == torch.uint8, X.dtype
+    return X[:, -1, :, :].unsqueeze(1).float() / 255.
 
   def fit(self, X, y, initiation_gvf=None, goal=None, n_epochs=1):
     dataset = ClassifierDataset(X, y)
-    dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
+    dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True, collate_fn=collate_fn)
 
     if self.should_train(y):
       losses = []
@@ -119,7 +120,7 @@ class ConvClassifier:
       sampled_inputs, sampled_labels = sample[0], sample[1]
       sampled_inputs = utils.tensorfy(sampled_inputs, self.device)
       sampled_inputs = self.preprocess_batch(sampled_inputs)
-      sampled_labels = sampled_labels.to(self.device)
+      sampled_labels = torch.as_tensor(sampled_labels).to(self.device)
       
       pos_weight = self.determine_pos_weight(sampled_labels)
 
@@ -129,7 +130,7 @@ class ConvClassifier:
 
       if initiation_gvf is not None:
         weights = self.determine_instance_weights(
-          sample[0].numpy(), # DataLoader converts to tensor, undoing that here
+          np.asarray(sample[0]), # Batch of frame stacks
           sampled_labels,  # This is a tensor on the GPU
           initiation_gvf, goal
         )
@@ -150,6 +151,13 @@ class ConvClassifier:
       batch_losses.append(loss.item())
     
     return np.mean(batch_losses)
+  
+
+def collate_fn(data):
+  lazy_frames = [np.asarray(d[0]) for d in data]
+  labels = [d[1] for d in data]
+  return lazy_frames, labels
+
 
 
 class ClassifierDataset(Dataset):
