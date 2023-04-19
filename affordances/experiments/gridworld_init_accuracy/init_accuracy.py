@@ -58,11 +58,6 @@ def rollout_option(env, option, obs, info, method='learned') -> bool:
   
   return next_obs, next_info, reached, traj
 
-def update_params(agent_over_options, option, traj, success, method='learned'):
-  if method == 'learned':
-    option.update_option_after_rollout(traj, success)
-    agent_over_options.update_initiation_gvf(episode_duration=1)
-
 
 def save_data_tables(episode, ground_truth_table, measured_table):
   f1 = f'{g_log_dir}/episode_{episode}_gt.pkl'
@@ -138,11 +133,16 @@ if __name__ == '__main__':
         next_obs, next_info, reached, traj = rollout_option(environment, option, obs, info)
         ground_truth_initiations[state["player_pos"]][str(option)].append(reached)
 
-        # Update the options that were available according to the initiation sets
+        # On-policy things: add data to policy, classifier and GVF buffers;
+        # perform updates to the option policy. Reserved for available options.
         if measured_init:
-          update_params(agent_over_options, option, traj, reached)
+          option.update_option_after_rollout(traj, reached)
 
-        # TODO: Update the initiaitons for all options, even those that were not executed - maybe once every episode
+    # Off-policy things: minibatch updates on GVF and all initiation classifiers 
+    agent_over_options.update_initiation_gvf(episode_duration=100)
+    
+    for option in options:
+      option.update_option_initiation_classifiers()
     
     if episode % 10 == 0:
       save_data_tables(episode, ground_truth_initiations, measured_initiations)
