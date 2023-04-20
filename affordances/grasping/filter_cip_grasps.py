@@ -9,6 +9,7 @@ import numpy as np
 import torch
 import gym 
 import matplotlib.pyplot as plt
+from tqdm import tqdm
 
 import robosuite as suite
 from robosuite.controllers import load_controller_config
@@ -144,7 +145,7 @@ if __name__ == "__main__":
 
     wp_list = []
 
-    for try_grasp in heuristic_grasps:
+    for try_grasp in tqdm(heuristic_grasps):
        
         # try_grasp is in world frame of original task env 
         # convert into current world frame 
@@ -168,7 +169,7 @@ if __name__ == "__main__":
             
             if RENDER: 
                 env.render()
-                input("GRASP PASSED IK AND COLLISION CHECK 1")
+                # input("GRASP PASSED IK AND COLLISION CHECK 1")
 
             grasp_qpos = deepcopy(env.sim.data.qpos[:7])
 
@@ -215,7 +216,7 @@ if __name__ == "__main__":
 
         if not is_valid_grasp: 
             wp_list.append([wp,0,"red"])
-            if RENDER: input("GRASP IK INFEASIBLE OR IN COLLISION")
+            # if RENDER: input("GRASP IK INFEASIBLE OR IN COLLISION")
             continue
 
         good_grasps.append([try_grasp_obj_frame, cur_grasp_wp_list, cur_grasp_qpos_list])
@@ -223,10 +224,11 @@ if __name__ == "__main__":
         if len(good_grasps) >= args.n:
             break
 
-    assert len(good_grasps) >= args.n, f"only got {len(good_grasps)} grasps"
     print(len(good_grasps))
     pickle.dump(good_grasps, open(heuristic_grasps_filtered_path,"wb"))
-
+    
+    assert len(good_grasps) >= args.n, f"only got {len(good_grasps)} grasps"
+    
     #red: IK infeasible or in collision
     #blue: joint violation after closing gripper
     #orange: lost contact after gripping
