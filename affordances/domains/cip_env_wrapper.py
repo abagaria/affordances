@@ -244,9 +244,15 @@ if __name__ == '__main__':
     utils.set_random_seed(0)
 
     # env = make_robosuite_env("DoorCIP", render=True, segment=True)
-    # env = make_robosuite_env("LeverCIP", render=True)
-    env = make_robosuite_env("SlideCIP", render=True)
+    # env = make_robosuite_env("LeverCIP", render=True, segment=True)
+    # env = make_robosuite_env("SlideCIP", render=True, segment=True)
     # env = make_robosuite_env("DrawerCIP", render=True, segment=True)
+
+    # env = make_robosuite_env("DoorCIP", render=True, segment=False) # good
+    # env = make_robosuite_env("LeverCIP", render=True, segment=False) # good
+    # env = make_robosuite_env("SlideCIP", render=True, segment=False) # good
+    # env = make_robosuite_env("DrawerCIP", render=True, segment=False) # n=3
+
     grasps = env.load_grasps()
     for i in range(len(grasps)):
         print(i % len(grasps))
