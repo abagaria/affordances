@@ -16,6 +16,7 @@ from affordances.utils.utils import safe_zip_write
 from affordances.domains.montezuma.montezuma import environment_builder, montezuma_subgoals
 from affordances.experiments.gridworld_init_accuracy.options import AgentOverOptions
 from affordances.utils.init_accuracy_plotting import visualize_initiation_table
+from affordances.utils.plotting import visualize_initiation_classifier
 
 
 path_to_resources = os.path.expanduser("~/Downloads/")
@@ -46,10 +47,9 @@ def rollout_option(env, option, obs, info, method='learned') -> bool:
   
   next_obs, next_info, reward, reached, n_steps, traj = option.rollout(
     env, obs, info)
-    
-  pos = info['player_pos']
-  next_pos = next_info['player_pos']
-  print(f'{option} s:{pos} sp: {next_pos} reward={reward} success={reached}')
+  
+  print(f'{option} g:{option.subgoal_info["player_pos"]} s:{info["player_pos"]}',
+        f'sp: {next_info["player_pos"]} T={n_steps} R={reward} success={reached}')
   
   return next_obs, next_info, reached, traj
 
@@ -73,7 +73,7 @@ if __name__ == '__main__':
   parser.add_argument('--plotting_frequency', type=int, default=-1)
   parser.add_argument('--log_dir', type=str, default='/gpfs/data/gdk/abagaria/affordances_logs')
   parser.add_argument('--plot_dir', type=str, default='/gpfs/data/gdk/abagaria/affordances_plots')
-  parser.add_argument('--max_frames_per_episode', type=int, default=200)
+  parser.add_argument('--max_frames_per_episode', type=int, default=30*60*60)
   args = parser.parse_args()
 
   g_log_dir = os.path.join(args.log_dir, args.experiment_name)
@@ -118,6 +118,10 @@ if __name__ == '__main__':
         # Reset the simulator to the specific state
         obs, info = reset(environment, state)
 
+        # If the state is in the option's goal, move on to the next option
+        if option.is_term_true(obs, info):
+          continue
+
         # Measured option availability
         measured_init = option.optimistic_is_init_true(obs, info)
         measured_initiations[state["player_pos"]][str(option)].append(measured_init)
@@ -141,3 +145,9 @@ if __name__ == '__main__':
       save_data_tables(episode, ground_truth_initiations, measured_initiations)
       visualize_initiation_table(ground_truth_initiations, options, g_plot_dir, 'gt', episode)
       visualize_initiation_table(measured_initiations, options, g_plot_dir, 'measured', episode)
+      [visualize_initiation_classifier(option.initiation_classifier,
+                                      agent_over_options.initiation_gvf,
+                                      agent_over_options.initiation_gvf.initiation_replay_buffer,
+                                      option.subgoal_obs, option.subgoal_info,
+                                      str(option), episode, args.plot_dir,
+                                      args.experiment_name, args.seed) for option in options]
