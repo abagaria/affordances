@@ -57,6 +57,7 @@ def get_data(rootDir, conditions=None, task=None, smoothen=10):
       eval_files = pickle.load(gzip.open(path, "rb+"))
       eval_successes = eval_files['success']
       eval_rewards = eval_files['rewards']
+      print(len(eval_successes))
 
       log_df = pd.DataFrame()
       log_df['success'] = moving_average(eval_successes, n=smoothen)
@@ -97,6 +98,7 @@ if __name__ == '__main__':
                   hue="condition",
                   hue_order=conditions.keys(),
                   col="environment_name",
+                  row="optimal_ik",
                   facet_kws={"sharex":False,"sharey":True},
                   errorbar="se"
   )
