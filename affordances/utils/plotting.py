@@ -119,9 +119,9 @@ def visualize_gc_initiation_learner(
   value_dict = {}
   for pos in state_dict:
     nsg = state_dict[pos]
-    obs = nsg[0][None, ...]
-    assert obs.shape == (1, 84, 84), obs.shape
-    value = initiation_learner.get_values([obs], [goal])
+    obs = np.asarray(nsg._frames[:-1]).squeeze(1)[None, ...]
+    assert obs.shape == (1, 4, 84, 84), obs.shape
+    value = initiation_learner.get_values(obs, goal._frames[-1])
     value_dict[pos] = value.item()
   
   x = [pos[0] for pos in value_dict]
@@ -161,12 +161,13 @@ def visualize_initiation_classifier(
   option_name, episode, plot_base_dir, experiment_name, seed
 ):
   state_dict = parse_replay(replay)
-  value_dict = {}
+  value_dict = collections.defaultdict(float)
+  
   for pos in state_dict:
     nsg = state_dict[pos]
-    obs = nsg[0][None, ...][None, ...]
-    assert obs.shape == (1, 1, 84, 84), obs.shape  # [B, C, H, W]
-    value = initiation_classifier.optimistic_predict(obs)
+    # obs = nsg[0][None, ...][None, ...]
+    # assert obs.shape == (1, 1, 84, 84), obs.shape  # [B, C, H, W]
+    value = initiation_classifier.optimistic_predict([nsg])
     value_dict[pos] = value.item()
   
   x = [pos[0] for pos in value_dict]
@@ -186,7 +187,7 @@ def visualize_initiation_classifier(
 
   # Plot the initiation GVF
   plt.subplot(2, 2, 2)
-  pos2value = visualize_gc_initiation_learner(
+  visualize_gc_initiation_learner(
     init_gvf, replay, goal, goal_info, episode,
     plot_base_dir, experiment_name, seed, save_fig=False)
 
@@ -200,19 +201,19 @@ def visualize_initiation_classifier(
   x_negatives = [eg[1]['player_x'] for eg in negatives]
   y_negatives = [eg[1]['player_y'] for eg in negatives]
 
-  weights_positives = [pos2value[eg[1]['player_pos']] for eg in positives]
-  weights_negatives = [(1 - pos2value[eg[1]['player_pos']]) for eg in negatives]
+  weights_positives = [value_dict[eg[1]['player_pos']] for eg in positives]
+  weights_negatives = [(1 - value_dict[eg[1]['player_pos']]) for eg in negatives]
   
   plt.scatter(x_positives, y_positives, c=weights_positives)
-  plt.xlim(xlim)
-  plt.ylim(ylim)
+  # plt.xlim(xlim)
+  # plt.ylim(ylim)
   plt.colorbar()
   plt.title('Clf Positive Examples')
 
   plt.subplot(2, 2, 4)
   plt.scatter(x_negatives, y_negatives, c=weights_negatives)
-  plt.xlim(xlim)
-  plt.ylim(ylim)
+  # plt.xlim(xlim)
+  # plt.ylim(ylim)
   plt.colorbar()
   plt.title('Clf Negative Examples')
 
