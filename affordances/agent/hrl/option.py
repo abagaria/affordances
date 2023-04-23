@@ -26,7 +26,8 @@ class Option:
     use_her_for_policy_evaluation: bool,
     use_weighted_classifiers: bool,
     subgoal_obs: np.ndarray,
-    subgoal_info: dict):
+    subgoal_info: dict,
+    only_reweigh_negative_examples: bool):
       self._timeout = timeout
       self._solver = uvfa_policy
       self._option_idx = option_idx
@@ -55,7 +56,8 @@ class Option:
         optimistic_threshold=0.5,
         pessimistic_threshold=0.75,
         n_input_channels=1,
-        image_dim=subgoal_obs._frames[0].squeeze().shape[0]  # TODO
+        image_dim=subgoal_obs._frames[0].squeeze().shape[0],  # TODO
+        only_reweigh_negative_examples=only_reweigh_negative_examples
       )
 
       self.subgoal_obs = subgoal_obs

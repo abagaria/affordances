@@ -13,17 +13,25 @@ class ConvInitiationClassifier(InitiationClassifier):
     device, 
     optimistic_threshold: float,
     pessimistic_threshold: float,
+    only_reweigh_negative_examples: bool,
     n_input_channels: int = 1,
     maxlen: int = 10,
     image_dim : int = 84
   ):
     self.device = device
+    self.image_dim = image_dim
     self.optimistic_threshold = optimistic_threshold
     self.pessimistic_threshold = pessimistic_threshold
     self.n_input_channels = n_input_channels
+    self.only_reweigh_negative_examples = only_reweigh_negative_examples
     
     self.classifier = ConvClassifier(
-      device, None, n_input_channels, image_dim=image_dim)
+      device=device,
+      only_reweigh_negative_examples=only_reweigh_negative_examples,
+      threshold=None,
+      n_input_channels=n_input_channels,
+      image_dim=image_dim
+    )
     
     super().__init__(max_n_trajectories=maxlen)
 
@@ -70,6 +78,13 @@ class ConvInitiationClassifier(InitiationClassifier):
       Y = torch.cat((positive_labels, negative_labels), dim=0)
 
       if self.classifier.should_train(Y):
+        self.classifier = ConvClassifier(
+          device=self.device,
+          threshold=None,
+          n_input_channels=self.n_input_channels,
+          image_dim=self.image_dim,
+          only_reweigh_negative_examples=self.only_reweigh_negative_examples
+        )
         self.classifier.fit(X, Y, initiation_gvf, goal)
 
   def save(self, filename: str):

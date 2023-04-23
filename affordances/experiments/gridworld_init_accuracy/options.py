@@ -1,5 +1,7 @@
 """Create options for visual gridworld."""
 
+from __future__ import annotations
+
 import ipdb
 
 from affordances.agent.hrl.option import Option
@@ -16,12 +18,14 @@ class AgentOverOptions:
     timeout,
     image_dim: int,
     rams: list,
+    use_weighted_classifiers: bool,
+    only_reweigh_negative_examples: bool,
     gpu: int = 0,
     n_input_channels: int = 4,
     n_goal_channels: int = 1,
     env_steps: int = int(500_000),
     epsilon_decay_steps: int = 25_000,
-    final_epsilon: float = 0.1
+    final_epsilon: float | None = None
   ):
     self._env = env
     self._timeout = timeout
@@ -30,6 +34,8 @@ class AgentOverOptions:
     self._n_input_channels = n_input_channels
     self._n_goal_channels = n_goal_channels
     self._rams = rams
+    self._use_weighted_classifiers = use_weighted_classifiers
+    self._only_reweigh_negative_examples = only_reweigh_negative_examples
 
     self.image_dim = image_dim
     
@@ -102,8 +108,9 @@ class AgentOverOptions:
                       self._timeout,
                       exploration_bonus_scale=0,
                       use_her_for_policy_evaluation=True,
-                      use_weighted_classifiers=True,
+                      use_weighted_classifiers=self._use_weighted_classifiers,
                       subgoal_obs=subgoal_obs,
-                      subgoal_info=subgoal_info)
+                      subgoal_info=subgoal_info,
+                      only_reweigh_negative_examples=self._only_reweigh_negative_examples)
       options.append(option)
     return options

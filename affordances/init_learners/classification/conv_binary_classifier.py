@@ -5,7 +5,7 @@ import numpy as np
 import torch.nn.functional as F
 
 from affordances.utils import utils
-from pfrl.nn.atari_cnn import SmallAtariCNN
+from pfrl.nn.atari_cnn import SmallAtariCNN  # TODO: replace with our own copy that works for different image dims
 from torch.utils.data import Dataset, DataLoader
 from affordances.init_learners.gvf.init_gvf import GoalConditionedInitiationGVF
 
@@ -36,6 +36,7 @@ class ConvClassifier:
   """"Generic weighted binary convolutional classifier."""
   def __init__(self,
         device,
+        only_reweigh_negative_examples: bool,
         threshold=0.5,
         n_input_channels=1,
         batch_size=32,
@@ -46,6 +47,7 @@ class ConvClassifier:
     self.is_trained = False
     self.threshold = threshold
     self.batch_size = batch_size
+    self.only_reweigh_negative_examples = only_reweigh_negative_examples
 
     self.model = ImageCNN(n_input_channels, image_dim).to(device)
     self.optimizer = torch.optim.Adam(self.model.parameters(), lr=lr)
@@ -83,6 +85,10 @@ class ConvClassifier:
     values = utils.tensorfy(values, self.device)  # TODO(ab): keep these on GPU
     weights = values.clip(0., 1.)
     weights[labels == 0] = 1. - weights[labels == 0]
+
+    if self.only_reweigh_negative_examples:
+      values[labels == 1] = 1.
+
     return weights
 
   def should_train(self, y):
@@ -157,7 +163,6 @@ def collate_fn(data):
   lazy_frames = [np.asarray(d[0]) for d in data]
   labels = [d[1] for d in data]
   return lazy_frames, labels
-
 
 
 class ClassifierDataset(Dataset):
