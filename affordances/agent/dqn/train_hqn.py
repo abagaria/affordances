@@ -18,7 +18,7 @@ from pfrl.q_functions import DiscreteActionValueHead, DuelingDQN
 import affordances.agent.dqn.runloops as runloops
 import affordances.agent.dqn.wrappers as wrappers
 from affordances.agent.dqn.hddqn import HierarchicalDoubleDQN
-from affordances.agent.dqn.utils import RandomizeAction
+from affordances.agent.dqn.utils import RandomizeAction, SmallAtariCNN
 
 
 class SingleSharedBias(nn.Module):
@@ -69,7 +69,7 @@ def parse_arch(arch, n_actions):
         )
     elif arch == 'visgrid64':
         return nn.Sequential(
-            pnn.SmallAtariCNN(n_input_channels=1, n_linear_inputs=1152),
+            SmallAtariCNN(n_input_channels=1, n_linear_inputs=1152),
             init_chainer_default(nn.Linear(256, n_actions)),
             DiscreteActionValueHead(),
         )
