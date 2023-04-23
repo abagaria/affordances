@@ -140,3 +140,7 @@ settings.json
 *.pt
 *.pkl
 *.png
+*.npy
+*.zip
+*.diff
+*.sh
