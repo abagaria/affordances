@@ -161,7 +161,7 @@ def visualize_initiation_classifier(
   option_name, episode, plot_base_dir, experiment_name, seed
 ):
   state_dict = parse_replay(replay)
-  value_dict = collections.defaultdict(float)
+  value_dict = {}
   
   for pos in state_dict:
     nsg = state_dict[pos]
@@ -201,8 +201,14 @@ def visualize_initiation_classifier(
   x_negatives = [eg[1]['player_x'] for eg in negatives]
   y_negatives = [eg[1]['player_y'] for eg in negatives]
 
-  weights_positives = [value_dict[eg[1]['player_pos']] for eg in positives]
-  weights_negatives = [(1 - value_dict[eg[1]['player_pos']]) for eg in negatives]
+  def eg2val(eg, value_dict):
+    if eg[1]['player_pos'] in value_dict:
+      return value_dict[eg[1]['player_pos']]
+    obs = np.asarray(eg[0]._frames).squeeze(1)[None, ...]
+    return init_gvf.get_values(obs, goal._frames[-1]).item()
+
+  weights_positives = [eg2val(eg, value_dict) for eg in positives]
+  weights_negatives = [(1 - eg2val(eg, value_dict)) for eg in negatives]
   
   plt.scatter(x_positives, y_positives, c=weights_positives)
   # plt.xlim(xlim)
