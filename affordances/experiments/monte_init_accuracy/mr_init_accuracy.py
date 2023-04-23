@@ -13,18 +13,32 @@ from collections import defaultdict
 from affordances.utils import utils
 from affordances.agent.hrl.option import Option
 from affordances.utils.utils import safe_zip_write
-from affordances.domains.montezuma.montezuma import environment_builder, montezuma_subgoals
+from affordances.domains.montezuma.montezuma import environment_builder
+from affordances.domains.montezuma.montezuma import montezuma_subgoals, environment_rams
 from affordances.experiments.gridworld_init_accuracy.options import AgentOverOptions
 from affordances.utils.init_accuracy_plotting import visualize_initiation_table
 from affordances.utils.plotting import visualize_initiation_classifier
 
 
-path_to_resources = os.path.expanduser("~/Downloads/")
-
 def get_valid_states(env):
   states = []
+  for fname in utils.flatten(environment_rams):
+    with open(fname, 'rb') as f:
+      state_dict = pickle.load(f)
+      states.append(
+        dict(
+          player_pos=state_dict['position'],
+          ram=state_dict['ram'],
+          state=state_dict['state']
+        )
+      )
+  return states
+
+
+def get_subgoals(env):
+  states = []
   for fname in montezuma_subgoals:
-    with open(os.path.join(path_to_resources, fname), 'rb') as f:
+    with open(fname, 'rb') as f:
       state_dict = pickle.load(f)
       states.append(
         dict(
@@ -48,8 +62,9 @@ def rollout_option(env, option, obs, info, method='learned') -> bool:
   next_obs, next_info, reward, reached, n_steps, traj = option.rollout(
     env, obs, info)
   
-  print(f'{option} g:{option.subgoal_info["player_pos"]} s:{info["player_pos"]}',
-        f'sp: {next_info["player_pos"]} T={n_steps} R={reward} success={reached}')
+  print(f'{option} I={measured_init} g:{option.subgoal_info["player_pos"]}',
+        f's:{info["player_pos"]} sp: {next_info["player_pos"]} T={n_steps}',
+        f'R={reward} success={reached}')
   
   return next_obs, next_info, reached, traj
 
@@ -66,14 +81,18 @@ if __name__ == '__main__':
   parser = argparse.ArgumentParser()
   parser.add_argument('--experiment_name', type=str)
   parser.add_argument('--seed', type=int, default=42)
-  parser.add_argument('--gestation_period', type=int, default=5)
-  parser.add_argument('--timeout', type=int, default=50)
+  parser.add_argument('--gestation_period', type=int, default=10)
+  parser.add_argument('--timeout', type=int, default=200)
   parser.add_argument('--gpu_id', type=int, default=0)
-  parser.add_argument('--n_episodes', type=int, default=101)
-  parser.add_argument('--plotting_frequency', type=int, default=-1)
+  parser.add_argument('--n_episodes', type=int, default=1001)
+  parser.add_argument('--plotting_frequency', type=int, default=100)
   parser.add_argument('--log_dir', type=str, default='/gpfs/data/gdk/abagaria/affordances_logs')
   parser.add_argument('--plot_dir', type=str, default='/gpfs/data/gdk/abagaria/affordances_plots')
   parser.add_argument('--max_frames_per_episode', type=int, default=30*60*60)
+  parser.add_argument('--use_weighted_classifiers', action='store_true', default=False)
+  parser.add_argument('--only_reweigh_negative_examples', action='store_true', default=False)
+  parser.add_argument('--always_update', action='store_true', default=False)
+  parser.add_argument('--use_common_classifier', action='store_true', default=False)
   args = parser.parse_args()
 
   g_log_dir = os.path.join(args.log_dir, args.experiment_name)
@@ -100,7 +119,9 @@ if __name__ == '__main__':
     environment, gestation_period=args.gestation_period,
     timeout=args.timeout, gpu=args.gpu_id,
     image_dim=obs0._frames[0].squeeze().shape[0],
-    rams=states
+    rams=get_subgoals(environment),
+    use_weighted_classifiers=args.use_weighted_classifiers,
+    only_reweigh_negative_examples=args.only_reweigh_negative_examples
   )
   options = agent_over_options.options
 
@@ -109,6 +130,8 @@ if __name__ == '__main__':
     print("*" * 80)
     print("Episode ", episode)
     print("*" * 80)
+
+    n_gvf_updates = 0
 
     for state in states:
 
@@ -132,16 +155,21 @@ if __name__ == '__main__':
 
         # On-policy things: add data to policy, classifier and GVF buffers;
         # perform updates to the option policy. Reserved for available options.
-        if measured_init:
+        if measured_init or args.always_update:
+          n_gvf_updates += len(traj)
           option.update_option_after_rollout(traj, reached)
 
     # Off-policy things: minibatch updates on GVF and all initiation classifiers 
-    agent_over_options.update_initiation_gvf(episode_duration=100)
+    if args.use_weighted_classifiers:
+      n_gvf_updates = min(max(n_gvf_updates, 500), 5000)  # TODO: Hack to figure out its importance
+      print(f'About to perform {n_gvf_updates} GVF updates.')
+      agent_over_options.update_initiation_gvf(episode_duration=n_gvf_updates)
     
+    # Updating the GVF could have changed the init sets, so re-fit all the clfs
     for option in options:
       option.update_option_initiation_classifiers()
     
-    if episode % 10 == 0:
+    if episode % args.plotting_frequency == 0:
       save_data_tables(episode, ground_truth_initiations, measured_initiations)
       visualize_initiation_table(ground_truth_initiations, options, g_plot_dir, 'gt', episode)
       visualize_initiation_table(measured_initiations, options, g_plot_dir, 'measured', episode)
