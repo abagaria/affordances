@@ -8,19 +8,21 @@ import numpy as np
 import torch.nn.functional as F
 
 from torch.optim import Adam
-from pfrl.nn.atari_cnn import SmallAtariCNN
 from pfrl.replay_buffer import batch_experiences
 from pfrl.utils.copy_param import synchronize_parameters
 from pfrl.replay_buffers.prioritized import PrioritizedReplayBuffer
 
+from affordances.utils.nn import SmallAtariCNN
+
 
 class QNetwork(torch.nn.Module):
-  def __init__(self, n_input_channels, n_actions, image_dim=84):
+  def __init__(self, n_input_channels, n_actions, image_dim=84, use_sigmoid=False):
     super().__init__()
 
     if image_dim == 84:
       torso = SmallAtariCNN(n_input_channels=n_input_channels,
-                                 n_output_channels=256)
+                                 n_output_channels=256,
+                                 use_sigmoid=use_sigmoid)
     else:
       assert image_dim == 64, image_dim
       torso = SmallAtariCNN(n_input_channels=n_input_channels,
@@ -71,7 +73,7 @@ class TDPolicyEvaluator:
     self._learning_rate = learning_rate
     self._maintain_prioritized_buffer = isinstance(replay, PrioritizedReplayBuffer)
 
-    self._online_q_network = QNetwork(n_input_channels, n_actions, image_dim)
+    self._online_q_network = QNetwork(n_input_channels, n_actions, image_dim, use_sigmoid=True)
     self._target_q_network = copy.deepcopy(self._online_q_network).eval().requires_grad_(False)
 
     self._n_updates = 0
