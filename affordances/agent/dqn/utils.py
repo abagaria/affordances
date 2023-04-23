@@ -1,8 +1,13 @@
 import gym
 import torch
 import numpy as np
+import torch.nn as nn
+import torch.nn.functional as F
+
 
 from pfrl.utils import batch_states
+from pfrl.nn.atari_cnn import constant_bias_initializer
+from pfrl.initializers import init_chainer_default
 
 
 def batch_experiences(experiences, device, phi, gamma, batch_states=batch_states):
@@ -100,3 +105,36 @@ class RandomizeAction(gym.ActionWrapper):
     def seed(self, seed):
         super().seed(seed)
         self._np_random.seed(seed)
+
+
+class SmallAtariCNN(torch.nn.Module):
+    """Small CNN module proposed for DQN in NeurIPS DL Workshop, 2013.
+
+    See: https://arxiv.org/abs/1312.5602
+    """
+
+    def __init__(
+        self, n_input_channels=4, n_output_channels=256,
+        activation=F.relu, bias=0.1, n_linear_inputs=2592
+    ):
+        self.n_input_channels = n_input_channels
+        self.activation = activation
+        self.n_output_channels = n_output_channels
+        super().__init__()
+        self.layers = nn.ModuleList(
+            [
+                nn.Conv2d(n_input_channels, 16, 8, stride=4),
+                nn.Conv2d(16, 32, 4, stride=2),
+            ]
+        )
+        self.output = nn.Linear(n_linear_inputs, n_output_channels)
+
+        self.apply(init_chainer_default)
+        self.apply(constant_bias_initializer(bias=bias))
+
+    def forward(self, state):
+        h = state
+        for layer in self.layers:
+            h = self.activation(layer(h))
+        h_flat = h.view(h.size(0), -1)
+        return self.activation(self.output(h_flat))
