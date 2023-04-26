@@ -55,13 +55,11 @@ class SmallAtariCNN(nn.Module):
 
     def __init__(
         self, n_input_channels=4, n_output_channels=256,
-        activation=F.relu, bias=0.1, n_linear_inputs=2592,
-        use_sigmoid=False
+        activation=F.relu, bias=0.1, n_linear_inputs=2592
     ):
         self.n_input_channels = n_input_channels
         self.activation = activation
         self.n_output_channels = n_output_channels
-        self.use_sigmoid = use_sigmoid
 
         super().__init__()
         self.layers = nn.ModuleList(
@@ -80,6 +78,4 @@ class SmallAtariCNN(nn.Module):
         for layer in self.layers:
             h = self.activation(layer(h))
         h_flat = h.view(h.size(0), -1)
-        if self.use_sigmoid:
-            return torch.sigmoid(self.output(h_flat))
         return self.activation(self.output(h_flat))

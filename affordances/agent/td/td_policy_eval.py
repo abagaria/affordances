@@ -18,11 +18,11 @@ from affordances.utils.nn import SmallAtariCNN
 class QNetwork(torch.nn.Module):
   def __init__(self, n_input_channels, n_actions, image_dim=84, use_sigmoid=False):
     super().__init__()
+    self._use_sigmoid = use_sigmoid
 
     if image_dim == 84:
       torso = SmallAtariCNN(n_input_channels=n_input_channels,
-                                 n_output_channels=256,
-                                 use_sigmoid=use_sigmoid)
+                                 n_output_channels=256)
     else:
       assert image_dim == 64, image_dim
       torso = SmallAtariCNN(n_input_channels=n_input_channels,
@@ -36,6 +36,8 @@ class QNetwork(torch.nn.Module):
     )
 
   def forward(self, x):
+    if self._use_sigmoid:
+      return torch.sigmoid(self.model(x.float()))
     return self.model(x.float())
 
 
