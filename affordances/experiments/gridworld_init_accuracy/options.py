@@ -20,6 +20,7 @@ class AgentOverOptions:
     rams: list,
     use_weighted_classifiers: bool,
     only_reweigh_negative_examples: bool,
+    use_gvf_as_initiation_classifier: bool,
     gpu: int = 0,
     n_input_channels: int = 4,
     n_goal_channels: int = 1,
@@ -36,6 +37,7 @@ class AgentOverOptions:
     self._rams = rams
     self._use_weighted_classifiers = use_weighted_classifiers
     self._only_reweigh_negative_examples = only_reweigh_negative_examples
+    self._use_gvf_as_initiation_classifier = use_gvf_as_initiation_classifier
 
     self.image_dim = image_dim
     
@@ -111,6 +113,7 @@ class AgentOverOptions:
                       use_weighted_classifiers=self._use_weighted_classifiers,
                       subgoal_obs=subgoal_obs,
                       subgoal_info=subgoal_info,
-                      only_reweigh_negative_examples=self._only_reweigh_negative_examples)
+                      only_reweigh_negative_examples=self._only_reweigh_negative_examples,
+                      use_gvf_as_initiation_classifier=self._use_gvf_as_initiation_classifier)
       options.append(option)
     return options

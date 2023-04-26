@@ -27,7 +27,8 @@ class Option:
     use_weighted_classifiers: bool,
     subgoal_obs: np.ndarray,
     subgoal_info: dict,
-    only_reweigh_negative_examples: bool):
+    only_reweigh_negative_examples: bool,
+    use_gvf_as_initiation_classifier: bool):
       self._timeout = timeout
       self._solver = uvfa_policy
       self._option_idx = option_idx
@@ -36,6 +37,11 @@ class Option:
       self._exploration_bonus_scale = exploration_bonus_scale
       self._use_her_for_policy_evaluation = use_her_for_policy_evaluation
       self._use_weighted_classifiers = use_weighted_classifiers
+      self._use_gvf_as_initiation_classifier = use_gvf_as_initiation_classifier
+
+      if use_gvf_as_initiation_classifier:
+        assert not use_weighted_classifiers
+        assert not only_reweigh_negative_examples
       
       self.initiation_gvf = initiation_gvf
 
@@ -58,7 +64,7 @@ class Option:
         n_input_channels=1,
         image_dim=subgoal_obs._frames[0].squeeze().shape[0],  # TODO
         only_reweigh_negative_examples=only_reweigh_negative_examples
-      )
+      ) if not use_gvf_as_initiation_classifier else None
 
       self.subgoal_obs = subgoal_obs
       self.subgoal_info = subgoal_info
@@ -76,11 +82,19 @@ class Option:
     if self._is_global_option or self.training_phase == 'gestation':
       return True
     
+    if self._use_gvf_as_initiation_classifier:
+      value = self.initiation_gvf.get_values(
+        states=np.asarray(state)[np.newaxis, ...],  # (1, 4, 84, 84)
+        goals=np.asarray(self.subgoal_obs)[-1:]  # (1, 84, 84)
+      )
+      return value.item() > 0.5
+    
     return self.initiation_classifier.optimistic_predict([state]) or \
            self.initiation_classifier.pessimistic_predict([state])
 
   def pessimistic_is_init_true(self, state, info):
-    return self.initiation_classifier.pessimistic_predict([state])
+    # return self.initiation_classifier.pessimistic_predict([state])
+    raise NotImplementedError()
 
   def is_term_true(self, state, info):
     return self.termination_classifier(info)  # or info['terminated']
@@ -128,7 +142,7 @@ class Option:
 
     self.update_option_params(transitions, self.subgoal_obs, self.subgoal_info)
 
-    if not self._is_global_option:
+    if not self._is_global_option and not self._use_gvf_as_initiation_classifier:
       self.initiation_classifier.add_trajectory(transitions, success)
 
   def update_option_params(self, transitions, goal, goal_info):
