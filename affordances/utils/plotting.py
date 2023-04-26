@@ -111,7 +111,7 @@ def visualize_initiation_set(option, replay, episode, experiment_name, seed):
   
 def visualize_gc_initiation_learner(
     initiation_learner, replay, goal, goal_info,
-    episode, plot_base_dir, experiment_name, seed,
+    episode, plot_base_dir, seed,
     save_fig=True
   ):
   
@@ -129,9 +129,10 @@ def visualize_gc_initiation_learner(
   v = [value_dict[pos] for pos in value_dict]
   plt.scatter(x, y, c=v)
   plt.colorbar()
-  plt.title(f'Goal pos: {goal_info["player_pos"]}')
+  gpos = goal_info["player_pos"]
+  plt.title(f'Goal pos: {gpos}')
   if save_fig:
-    plt.savefig(f'{plot_base_dir}/{experiment_name}/init_vf_{seed}_{episode}.png')
+    plt.savefig(f'{plot_base_dir}/init_vf_{gpos}_{seed}_{episode}.png')
     plt.close()
   return value_dict
 
@@ -189,7 +190,7 @@ def visualize_initiation_classifier(
   plt.subplot(2, 2, 2)
   visualize_gc_initiation_learner(
     init_gvf, replay, goal, goal_info, episode,
-    plot_base_dir, experiment_name, seed, save_fig=False)
+    plot_base_dir, seed, save_fig=False)
 
   # Plot the training examples
   plt.subplot(2, 2, 3)
@@ -224,5 +225,20 @@ def visualize_initiation_classifier(
   plt.title('Clf Negative Examples')
 
   filename = f'{option_name}_init_vf_{pos}_{seed}_{episode}.png'
-  plt.savefig(f'{plot_base_dir}/{experiment_name}/{filename}')
+  plt.savefig(f'{plot_base_dir}/{filename}')
   plt.close()
+
+
+def visualize_info_trajectory(traj, fname):
+  infos = [trans[1] for trans in traj]
+  x = [info['player_x'] for info in infos]
+  y = [info['player_y'] for info in infos]
+  plt.scatter(x, y)
+  plt.savefig(fname)
+  plt.close()
+
+
+def visualize_obs_trajectory(traj, fname):
+  lz_frames = [trans[0] for trans in traj]
+  for i, stack in enumerate(lz_frames):
+    utils.show_frame_stack(stack, f'{i}_{fname}')
