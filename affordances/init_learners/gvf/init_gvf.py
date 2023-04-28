@@ -22,10 +22,14 @@ class InitiationGVF(InitiationLearner):
       pessimistic_threshold: float = 0.8,
       use_prioritized_buffer: bool = True,
       init_replay_capacity: int = 100_000,
-      image_dim: int = 84):
+      image_dim: int = 84,
+      uncertainty_type: str = 'none'):
+    assert uncertainty_type in ('none', 'competence'), uncertainty_type
+
     super().__init__()
     self._n_actions = n_actions
     self._n_input_channels = n_input_channels
+    self._uncertainty_type = uncertainty_type
 
     # Function that maps batch of states to batch of actions (`batch_act()`)
     self.target_policy = target_policy
@@ -44,6 +48,8 @@ class InitiationGVF(InitiationLearner):
       image_dim=image_dim
     )
 
+    print(f'Created InitiationGVF with uncertainty_method={uncertainty_type}')
+
   def add_trajectory_to_replay(self, transitions):
     for state, action, rg, next_state, done, info in transitions:
       self.initiation_replay_buffer.append(
@@ -59,6 +65,8 @@ class InitiationGVF(InitiationLearner):
     values = self.policy_evaluation_module.get_values(states)
     if bonuses is not None:
       values += bonuses
+    elif self._uncertainty_type == 'competence':
+      values += self.policy_evaluation_module.get_value_change(states)
     return values > self.optimistic_threshold
 
   def pessimistic_predict(self, states: np.ndarray) -> np.ndarray:
@@ -103,7 +111,16 @@ class GoalConditionedInitiationGVF(InitiationGVF):
     if len(goals.shape) < len(states.shape):
       goals = goals[:, np.newaxis, :, :]  # (N, 84, 84) -> (N, 1, 84, 84)
     augmented_states = np.concatenate((states, goals), axis=1)
-    return self.policy_evaluation_module.get_values(augmented_states)
+    value = self.policy_evaluation_module.get_values(augmented_states)
+    if self._uncertainty_type == 'competence':
+      value += self.policy_evaluation_module.get_value_change(augmented_states)
+    return value
+  
+  def get_value_changes(self, states, goals):
+    if len(goals.shape) < len(states.shape):
+      goals = goals[:, np.newaxis, :, :]  # (N, 84, 84) -> (N, 1, 84, 84)
+    augmented_states = np.concatenate((states, goals), axis=1)
+    return self.policy_evaluation_module.get_value_change(augmented_states)
 
   def optimistic_predict(self, states, goals, bonuses=None) -> np.ndarray:
     values = self.get_values(states, goals)
