@@ -28,7 +28,10 @@ class Option:
     subgoal_obs: np.ndarray,
     subgoal_info: dict,
     only_reweigh_negative_examples: bool,
-    use_gvf_as_initiation_classifier: bool):
+    use_gvf_as_initiation_classifier: bool,
+    optimistic_threshold: float,
+    n_classifier_training_trajectories: int,
+    n_classifier_training_epochs: int):
       self._timeout = timeout
       self._solver = uvfa_policy
       self._option_idx = option_idx
@@ -38,6 +41,10 @@ class Option:
       self._use_her_for_policy_evaluation = use_her_for_policy_evaluation
       self._use_weighted_classifiers = use_weighted_classifiers
       self._use_gvf_as_initiation_classifier = use_gvf_as_initiation_classifier
+      self._optimistic_threshold = optimistic_threshold
+
+      self._n_epochs = n_classifier_training_epochs
+      self._maxlen = n_classifier_training_trajectories
 
       if use_gvf_as_initiation_classifier:
         assert not use_weighted_classifiers
@@ -59,11 +66,13 @@ class Option:
 
       self.initiation_classifier = ConvInitiationClassifier(
         device=uvfa_policy.device,
-        optimistic_threshold=0.5,
+        optimistic_threshold=self._optimistic_threshold,
         pessimistic_threshold=0.75,
         n_input_channels=1,
         image_dim=subgoal_obs._frames[0].squeeze().shape[0],  # TODO
-        only_reweigh_negative_examples=only_reweigh_negative_examples
+        only_reweigh_negative_examples=only_reweigh_negative_examples,
+        maxlen=self._maxlen,
+        n_epochs=self._n_epochs
       ) if not use_gvf_as_initiation_classifier else None
 
       self.subgoal_obs = subgoal_obs
@@ -83,11 +92,12 @@ class Option:
       return True
     
     if self._use_gvf_as_initiation_classifier:
+      # TODO(ab): Moidy and use the GVF's optimistic_predict()
       value = self.initiation_gvf.get_values(
         states=np.asarray(state)[np.newaxis, ...],  # (1, 4, 84, 84)
-        goals=np.asarray(self.subgoal_obs)[-1:]  # (1, 84, 84)
+        goals=np.asarray(self.subgoal_obs)[-1:],  # (1, 84, 84)
       )
-      return value.item() > 0.5
+      return value.item() > self._optimistic_threshold
     
     return self.initiation_classifier.optimistic_predict([state]) or \
            self.initiation_classifier.pessimistic_predict([state])

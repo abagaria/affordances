@@ -21,12 +21,16 @@ class AgentOverOptions:
     use_weighted_classifiers: bool,
     only_reweigh_negative_examples: bool,
     use_gvf_as_initiation_classifier: bool,
+    uncertainty_type: str,
     gpu: int = 0,
     n_input_channels: int = 4,
     n_goal_channels: int = 1,
     env_steps: int = int(500_000),
     epsilon_decay_steps: int = 25_000,
-    final_epsilon: float | None = None
+    final_epsilon: float | None = None,
+    optimistic_threshold: float = 0.5,
+    n_classifier_training_trajectories: int = 10,
+    n_classifier_training_epochs: int = 1
   ):
     self._env = env
     self._timeout = timeout
@@ -38,6 +42,10 @@ class AgentOverOptions:
     self._use_weighted_classifiers = use_weighted_classifiers
     self._only_reweigh_negative_examples = only_reweigh_negative_examples
     self._use_gvf_as_initiation_classifier = use_gvf_as_initiation_classifier
+    self._optimistic_threshold = optimistic_threshold
+    self._uncertainty_type = uncertainty_type
+    self._n_classifier_training_trajectories = n_classifier_training_trajectories
+    self._n_classifier_training_epochs = n_classifier_training_epochs
 
     self.image_dim = image_dim
     
@@ -80,7 +88,8 @@ class AgentOverOptions:
       n_input_channels=self._n_input_channels + self._n_goal_channels,
       optimistic_threshold=0.5,
       pessimistic_threshold=0.75,  # don't need this
-      image_dim=self.image_dim
+      image_dim=self.image_dim,
+      uncertainty_type=self._uncertainty_type
     )
   
   def get_subgoal_positions_for_6x6_gridworld(self):
@@ -114,6 +123,9 @@ class AgentOverOptions:
                       subgoal_obs=subgoal_obs,
                       subgoal_info=subgoal_info,
                       only_reweigh_negative_examples=self._only_reweigh_negative_examples,
-                      use_gvf_as_initiation_classifier=self._use_gvf_as_initiation_classifier)
+                      use_gvf_as_initiation_classifier=self._use_gvf_as_initiation_classifier,
+                      optimistic_threshold=self._optimistic_threshold,
+                      n_classifier_training_trajectories=self._n_classifier_training_trajectories,
+                      n_classifier_training_epochs=self._n_classifier_training_epochs)
       options.append(option)
     return options

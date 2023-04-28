@@ -15,10 +15,12 @@ class ConvInitiationClassifier(InitiationClassifier):
     pessimistic_threshold: float,
     only_reweigh_negative_examples: bool,
     n_input_channels: int = 1,
-    maxlen: int = 10,
-    image_dim : int = 84
+    maxlen: int = 1000,
+    image_dim : int = 84,
+    n_epochs: int = 1
   ):
     self.device = device
+    self.n_epochs = n_epochs
     self.image_dim = image_dim
     self.optimistic_threshold = optimistic_threshold
     self.pessimistic_threshold = pessimistic_threshold
@@ -32,8 +34,9 @@ class ConvInitiationClassifier(InitiationClassifier):
       n_input_channels=n_input_channels,
       image_dim=image_dim
     )
-    
+
     super().__init__(max_n_trajectories=maxlen)
+    print(f'Created clf with thresh={optimistic_threshold}, maxlen={maxlen}')
 
   def _predict(self, states: np.ndarray, threshold) -> np.ndarray:
     # TODO: This converts lz -> np.array. Do this in one place.
@@ -85,7 +88,7 @@ class ConvInitiationClassifier(InitiationClassifier):
           image_dim=self.image_dim,
           only_reweigh_negative_examples=self.only_reweigh_negative_examples
         )
-        self.classifier.fit(X, Y, initiation_gvf, goal)
+        self.classifier.fit(X, Y, initiation_gvf, goal, n_epochs=self.n_epochs)
 
   def save(self, filename: str):
     torch.save(self.classifier.model.state_dict(), filename)

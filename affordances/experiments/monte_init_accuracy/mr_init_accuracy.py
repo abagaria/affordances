@@ -96,6 +96,10 @@ if __name__ == '__main__':
   parser.add_argument('--always_update', action='store_true', default=False)
   parser.add_argument('--use_gvf_as_initiation_classifier', action='store_true', default=False)
   parser.add_argument('--dev_mode', action='store_true', default=False)
+  parser.add_argument('--optimistic_threshold', type=float, default=0.5)
+  parser.add_argument('--uncertainty_type', type=str, default='none')
+  parser.add_argument('--n_classifier_training_trajectories', type=int, default=10)
+  parser.add_argument('--n_classifier_training_epochs', type=int, default=1)
   args = parser.parse_args()
 
   g_log_dir = os.path.join(args.log_dir, args.experiment_name, args.sub_dir)
@@ -131,7 +135,11 @@ if __name__ == '__main__':
     rams=get_subgoals(environment),
     use_weighted_classifiers=args.use_weighted_classifiers,
     only_reweigh_negative_examples=args.only_reweigh_negative_examples,
-    use_gvf_as_initiation_classifier=args.use_gvf_as_initiation_classifier
+    use_gvf_as_initiation_classifier=args.use_gvf_as_initiation_classifier,
+    optimistic_threshold=args.optimistic_threshold,
+    uncertainty_type=args.uncertainty_type,
+    n_classifier_training_trajectories=args.n_classifier_training_trajectories,
+    n_classifier_training_epochs=args.n_classifier_training_epochs
   )
   options = agent_over_options.options
 
