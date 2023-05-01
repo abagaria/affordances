@@ -107,12 +107,15 @@ class RobotEnvWrapper(gym.ObservationWrapper):
         self.use_qpos_cache = use_qpos_cache
         self.segment = segment
 
-    def get_states_from_grasps(self):
+    def get_states_from_grasps(self, n=1):
         states = []
+        qpos = []
         for grasp in self.grasp_list:
-            obs = self.reset_to(grasp)
-            states.append(obs)
-        return np.array(states)
+            for _ in range(n):
+                obs = self.reset_to(grasp)
+                states.append(obs)
+                qpos.append(copy.deepcopy(self.sim.data.qpos[:7]))
+        return np.array(states), np.array(qpos)
 
     def load_grasps(self):
         task = self.env.__class__.__name__
@@ -140,47 +143,28 @@ class RobotEnvWrapper(gym.ObservationWrapper):
 
         if sampled_pose is not None:
 
-            # compute index of sampled_pose 
-            # TODO: instead use index to reset?
-            if self.use_qpos_cache:
-                sampled_idx = -1
-                for i, g in enumerate(self.grasp_list):
-                    if np.all(sampled_pose == g):
-                        sampled_idx = i 
-                assert sampled_idx >= 0
-
-            # maybe check qpos_cache
-            if self.use_qpos_cache and sampled_idx in self.qpos_cache.keys():
-                assert self.deterministic_reset     
-                qpos = self.qpos_cache[sampled_idx]
-                self.grasp_success = self.reset_to_qpos(qpos, wide=True)
-                assert self.grasp_success
-
-            else:
-
-                # reset until grasp is feasible
-                # TODO: rethink this...return None?
-                # update score and sample again?  
-                keep_resetting = True
-                while keep_resetting:
-                    self.grasp_success = self.reset_to_grasp(
-                                            sampled_pose, wide=True, 
-                                            optimal_ik=self.optimal_ik,
-                                            frame=self.get_obj_pose(),
-                                            verbose=self.env.has_renderer
-                                         )
-                    if self.grasp_success:   
-                        keep_resetting = False
-                        if self.use_qpos_cache:
-                            self.qpos_cache[sampled_idx] = copy.deepcopy(self.sim.data.qpos[:7])
-
-                    if not self.learning:
-                        keep_resetting = False
-
+            self.grasp_success = self.reset_to_grasp(
+                                    sampled_pose, wide=True, 
+                                    optimal_ik=self.optimal_ik,
+                                    frame=self.get_obj_pose(),
+                                    verbose=self.env.has_renderer
+            )
+            assert self.grasp_success
             if self.pregrasp_policy:
                 obs = self.execute_pregrasp()
 
         return obs
+
+    def reset_to_joint_state(self, qpos):
+        obs = super().reset()
+        self.pre_grasp_complete = False
+        self.contact_hist = [True]*self.num_steps_lost_contact
+        self.grasp_success = self.reset_to_qpos(qpos, wide=True)
+        assert self.grasp_success
+        if self.pregrasp_policy:
+            obs = self.execute_pregrasp()
+        return obs
+
 
     def execute_pregrasp(self):
         # close gripper for a few frames
@@ -248,7 +232,7 @@ if __name__ == '__main__':
     # env = make_robosuite_env("SlideCIP", render=True, segment=True)
     # env = make_robosuite_env("DrawerCIP", render=True, segment=True)
 
-    # env = make_robosuite_env("DoorCIP", render=True, segment=False) # good
+    env = make_robosuite_env("DoorCIP", render=True, segment=False) # good
     # env = make_robosuite_env("LeverCIP", render=True, segment=False) # good
     # env = make_robosuite_env("SlideCIP", render=True, segment=False) # good
     # env = make_robosuite_env("DrawerCIP", render=True, segment=False) # n=3
