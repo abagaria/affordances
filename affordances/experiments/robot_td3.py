@@ -54,13 +54,14 @@ def train(agent: TD3, init_learner, sample_func, env, n_episodes):
   episodic_success = []
   n_steps = 0
   
+  qpos_per_grasp = 1 if env.optimal_ik else 5
   grasps = env.load_grasps()
-  grasp_state_vectors = env.get_states_from_grasps()
+  grasp_state_vectors, grasp_qpos = env.get_states_from_grasps(n=qpos_per_grasp)
   print('-- got grasps --')
 
   grasp_counts = {}
   grasp_success = {}
-  for i in range(len(grasps)):
+  for i in range(len(grasp_qpos)):
     grasp_counts[i] = 0
     grasp_success[i] = 0 
 
@@ -71,8 +72,8 @@ def train(agent: TD3, init_learner, sample_func, env, n_episodes):
 
     grasp_scores = init_learner.score(grasp_state_vectors)
     selected_idx = sample_func(grasp_scores)
-    selected_grasp = grasps[selected_idx]
-    obs = env.reset_to(selected_grasp)
+    selected_qpos = grasp_qpos[selected_idx]
+    obs = env.reset_to_joint_state(selected_qpos)
     
     trajectory = []  # (s, a, r, s', info)
     while not done:
@@ -127,6 +128,7 @@ if __name__ == '__main__':
   parser.add_argument('--init_learner', type=str, default='binary')
   parser.add_argument('--optimal_ik', type=utils.boolify, default=True)
   parser.add_argument('--segment', type=utils.boolify, default=True)
+  parser.add_argument('--render', type=utils.boolify, default=False)
   args = parser.parse_args()
   print(args)
 
@@ -147,7 +149,7 @@ if __name__ == '__main__':
   env = make_robosuite_env(
     args.environment_name, 
     deterministic=True, 
-    render=False, 
+    render=args.render, 
     use_qpos_cache=True,
     optimal_ik=args.optimal_ik,
     segment=args.segment
@@ -155,7 +157,7 @@ if __name__ == '__main__':
   td3_agent = create_agent(
     env.action_space, 
     env.observation_space,
-    gpu=args.gpu,
+    gpu=args.gpu if torch.cuda.is_available() else None,
     lr=args.lr,
     sigma=args.sigma
   )
