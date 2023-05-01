@@ -4,6 +4,7 @@ import pickle
 
 import gym
 import numpy as np 
+from tqdm import tqdm
 
 from gym import spaces 
 
@@ -110,11 +111,11 @@ class RobotEnvWrapper(gym.ObservationWrapper):
     def get_states_from_grasps(self, n=1):
         states = []
         qpos = []
-        for grasp in self.grasp_list:
+        for grasp in tqdm(self.grasp_list):
             for _ in range(n):
-                obs = self.reset_to(grasp)
+                obs, ik_soln = self.reset_to(grasp)
                 states.append(obs)
-                qpos.append(copy.deepcopy(self.sim.data.qpos[:7]))
+                qpos.append(ik_soln)
         return np.array(states), np.array(qpos)
 
     def load_grasps(self):
@@ -137,29 +138,34 @@ class RobotEnvWrapper(gym.ObservationWrapper):
 
     def reset_to(self, sampled_pose):
         obs = super().reset()
-
         self.pre_grasp_complete = False
         self.contact_hist = [True]*self.num_steps_lost_contact
-
+        
+        ik_soln = None 
         if sampled_pose is not None:
 
-            self.grasp_success = self.reset_to_grasp(
-                                    sampled_pose, wide=True, 
-                                    optimal_ik=self.optimal_ik,
-                                    frame=self.get_obj_pose(),
-                                    verbose=self.env.has_renderer
-            )
-            assert self.grasp_success
+            while True:
+                self.grasp_success = self.reset_to_grasp(
+                    sampled_pose, wide=True, 
+                    optimal_ik=self.optimal_ik,
+                    frame=self.get_obj_pose(),
+                    verbose=self.env.has_renderer
+                )
+                if self.grasp_success or not self.learning:
+                    break
+
+            ik_soln = copy.deepcopy(self.sim.data.qpos[:7])
             if self.pregrasp_policy:
                 obs = self.execute_pregrasp()
 
-        return obs
+        return obs, ik_soln
 
     def reset_to_joint_state(self, qpos):
         obs = super().reset()
         self.pre_grasp_complete = False
         self.contact_hist = [True]*self.num_steps_lost_contact
         self.grasp_success = self.reset_to_qpos(qpos, wide=True)
+
         assert self.grasp_success
         if self.pregrasp_policy:
             obs = self.execute_pregrasp()
