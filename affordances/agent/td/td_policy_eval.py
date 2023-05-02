@@ -15,11 +15,11 @@ from pfrl.replay_buffers.prioritized import PrioritizedReplayBuffer
 
 
 class QNetwork(torch.nn.Module):
-  def __init__(self, n_actions):
+  def __init__(self, n_input_channels, n_actions):
     super().__init__()
 
     self.model = torch.nn.Sequential(
-      SmallAtariCNN(n_input_channels=3, n_output_channels=256),  # already has relu at the end
+      SmallAtariCNN(n_input_channels=n_input_channels, n_output_channels=256),
       torch.nn.Linear(in_features=256, out_features=128),
       torch.nn.ReLU(),
       torch.nn.Linear(in_features=128, out_features=n_actions)
@@ -36,9 +36,10 @@ class TDPolicyEvaluator:
     self,
     replay: pfrl.replay_buffers.ReplayBuffer,
     n_actions: int,
+    n_input_channels: int,
     tau: float = 5e-3,
-    batch_size: int = 1024,
-    gamma: float = 0.999,
+    batch_size: int = 32,
+    gamma: float = 0.99,
     learning_rate: float = 1e-4,
   ):
     """Constructor for TD policy evaluation.
@@ -46,6 +47,7 @@ class TDPolicyEvaluator:
     Args:
       replay: pointer to the agent's replay buffer.
       n_actions (int): number of discrete actions in the env.
+      n_input_channels (int): e.g, 1 for grayscale, 3 for color, etc
       tau: (float) soft update param for updating target net.
       batch_size (int)
       gamma (float): discount factor
@@ -60,7 +62,7 @@ class TDPolicyEvaluator:
     self._learning_rate = learning_rate
     self._maintain_prioritized_buffer = isinstance(replay, PrioritizedReplayBuffer)
 
-    self._online_q_network = QNetwork(n_actions)
+    self._online_q_network = QNetwork(n_input_channels, n_actions)
     self._target_q_network = copy.deepcopy(self._online_q_network).eval().requires_grad_(False)
 
     self._n_updates = 0
@@ -78,8 +80,7 @@ class TDPolicyEvaluator:
     return np.asarray(x, dtype=np.float32) / 255.
 
   @torch.no_grad()
-  def get_values(self, params, states):
-    del params
+  def get_values(self, states):
     assert isinstance(states, np.ndarray), type(states)
     assert states.dtype == np.uint8, states.dtype
     qvalues = self._online_q_network(
@@ -123,7 +124,7 @@ class TDPolicyEvaluator:
     self._optimizer.step()
 
     self._update_target_network()
-    print(f'TDEvaluator Step#{self._n_updates} Loss: {loss.item()}')
+    # print(f'TDEvaluator Step#{self._n_updates} Loss: {loss.item()}')
     self._n_updates += 1
 
   @torch.no_grad()

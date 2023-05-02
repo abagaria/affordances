@@ -16,7 +16,7 @@ class InitiationClassifier(InitiationLearner):
   def optimistic_predict(self, states: np.ndarray) -> np.ndarray:
     raise NotImplementedError()
 
-  def pesssimistic_predict(self, states: np.ndarray) -> np.ndarray:
+  def pessimistic_predict(self, states: np.ndarray) -> np.ndarray:
     raise NotImplementedError()
 
   def add_trajectory(self, trajectory):

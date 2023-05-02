@@ -12,8 +12,8 @@ def create_agent(
   n_actions,
   gpu,
   n_input_channels,
-  env_steps=50_000,
-  lr=6.25e-5,
+  env_steps=500_000,
+  lr=1e-4,
   sigma=0.5
 ):
     kwargs = dict(
@@ -33,16 +33,20 @@ def concat(obs, goal):
    return np.concatenate((obs, goal), axis=0)
 
 
-def rollout(agent: Rainbow, env, goal: np.ndarray):
+def rollout(
+  agent: Rainbow, env, obs: np.ndarray, goal: np.ndarray, goal_info: dict
+):
   global goal_observation
 
   done = False
   episode_reward = 0.
-  obs, info = env.reset()
+  rewards = []
   trajectory = []
+  
   while not done:
     action = agent.act(concat(obs, goal))
     next_obs, reward, done, info = env.step(action)
+    rewards.append(reward)
     trajectory.append((obs, action, reward, next_obs, info))
 
     if reward == 1:
@@ -50,7 +54,13 @@ def rollout(agent: Rainbow, env, goal: np.ndarray):
 
     obs = next_obs
     episode_reward += reward
-  return trajectory
+  
+  # HER
+  experience_replay(agent, trajectory, goal, goal_info)
+  hindsight_goal, hindsight_goal_info = pick_hindsight_goal(trajectory)
+  experience_replay(agent, trajectory, hindsight_goal, hindsight_goal_info)
+
+  return obs, info, rewards
 
 
 def experience_replay(agent: Rainbow, transitions, goal, goal_info):
@@ -89,50 +99,66 @@ def pick_hindsight_goal(transitions, method='final'):
   raise NotImplementedError(method)
 
 
-def train(agent: Rainbow, env, n_episodes,
-          task_goal: np.ndarray, task_goal_info: dict):
+def train2(agent: Rainbow, env,
+           task_goal: np.ndarray, task_goal_info: dict,
+           start_episode, n_episodes):
   rewards = []
-  for _ in range(n_episodes):
+  for episode in range(start_episode, start_episode + n_episodes):
+    obs0, info0 = env.reset()
+    assert not info0['needs_reset'], info0
     goal, goal_info = select_goal(task_goal, task_goal_info)
-    trajectory = rollout(agent, env, goal)
-    experience_replay(agent, trajectory, goal, goal_info)
-    hindsight_goal, hindsight_goal_info = pick_hindsight_goal(trajectory)
-    experience_replay(agent, trajectory, hindsight_goal, hindsight_goal_info)
-    rewards.append(sum([transition[2] for transition in trajectory]))
-  return np.mean(rewards)
+    state, info, episode_rewards = rollout(agent, env, obs0, goal, goal_info)
+    undiscounted_return = sum(episode_rewards)
+    rewards.append(undiscounted_return)
+    print(100 * '-')
+    print(f'Episode: {episode}',
+      f"InitPos': {info0['player_pos']}",
+      f"GoalPos: {goal_info_dict['player_pos']}",
+      f"FinalPos: {info['player_pos']}",
+      f'Reward: {undiscounted_return}')
+    print(100 * '-')
+  return rewards
 
 
-def evaluate(agent: Rainbow, env, task_goal: np.ndarray, n_episodes: int = 10):
+def test(agent: Rainbow, env,
+         task_goal: np.ndarray, task_goal_info: dict,
+         n_episodes):
   rewards = []
-  for _ in range(n_episodes):
-    trajectory = rollout(agent, env, task_goal)
-    episode_rewards = [trans[2] for trans in trajectory]
-    rewards.append(sum(episode_rewards))
+  for episode in range(n_episodes):
+    env.reset()
+    obs0, info0 = env.reset_to(start_info['player_pos'])
+    assert not info0['needs_reset'], info0
+    goal, goal_info = select_goal(task_goal, task_goal_info)
+    state, info, episode_rewards = rollout(agent, env, obs0, goal, goal_info)
+    undiscounted_return = sum(episode_rewards)
+    rewards.append(undiscounted_return)
+    print(100 * '-')
+    print(f'[Test] Episode: {episode}',
+      f"InitPos': {info0['player_pos']}",
+      f"GoalPos: {goal_info_dict['player_pos']}",
+      f"FinalPos: {info['player_pos']}",
+      f'Reward: {undiscounted_return}')
+    print(100 * '-')
   return np.mean(rewards)
 
 
-def log(msr):
+def log(episode, msr):
   global success_rates
   success_rates.append(msr)
   fname = f'{g_log_dir}/log_seed{args.seed}.pkl'
-  utils.safe_zip_write(fname, {'success_rates': success_rates})
-
-
-def run(agent: Rainbow, env, n_iterations,
-        task_goal: np.ndarray, task_goal_info: dict):
-  for iter in range(n_iterations):
-    msr = train(agent, env, 10, task_goal, task_goal_info)
-    print(f'[TrainIter={iter}] Mean Success Rate: {msr}')
-    log(msr)
+  utils.safe_zip_write(fname, {'current_episode': episode,
+                               'rewards': success_rates})
 
 
 def run_with_eval(agent: Rainbow, env, n_iterations,
         task_goal: np.ndarray, task_goal_info: dict):
+  current_episode = 0
   for iter in range(n_iterations):
-    train(agent, env, 10, task_goal, task_goal_info)
-    msr = evaluate(agent, env, task_goal, n_episodes=10)
+    train2(agent, env, task_goal, task_goal_info, current_episode, 10)
+    msr = test(agent, env, task_goal, task_goal_info, 5)
     print(f'[EvaluationIter={iter}] Mean Success Rate: {msr}')
-    log(msr)
+    current_episode += 10
+    log(current_episode, msr)
 
 
 if __name__ == '__main__':
@@ -142,12 +168,14 @@ if __name__ == '__main__':
   parser.add_argument('--seed', type=int, default=42)
   parser.add_argument('--gpu', type=int, default=0)
   parser.add_argument('--environment_name', type=str, default='MiniGrid-Empty-8x8-v0')
-  parser.add_argument('--n_iterations', type=int, default=1000)
-  parser.add_argument('--lr', type=float, default=6.25e-5)
+  parser.add_argument('--n_iterations', type=int, default=500)
+  parser.add_argument('--lr', type=float, default=1e-4)
   parser.add_argument('--sigma', type=float, default=0.5)
   parser.add_argument('--exploration_bonus_scale', type=float, default=0)
   parser.add_argument('--log_dir', type=str, default='/gpfs/data/gdk/abagaria/affordances_logs')
-  parser.add_argument('--epsilon_decay_steps', type=int, default=25_000)
+  parser.add_argument('--epsilon_decay_steps', type=int, default=12_500)
+  parser.add_argument('--use_random_resets', action="store_true", default=False)
+  parser.add_argument('--n_actions', type=int, help='Specify the number of actions in the env')
   args = parser.parse_args()
 
   g_log_dir = os.path.join(args.log_dir, args.experiment_name, args.sub_dir)
@@ -160,10 +188,14 @@ if __name__ == '__main__':
   utils.set_random_seed(args.seed)
 
   environment = environment_builder(
-    args.environment_name, exploration_reward_scale=0)
+    level_name=args.environment_name,
+    seed=args.seed,
+    exploration_reward_scale=0,
+    random_reset=args.use_random_resets
+  )
 
   rainbow_agent = create_agent(
-    environment.action_space.n,
+    environment.action_space.n if args.n_actions is None else args.n_actions,
     gpu=args.gpu,
     n_input_channels=1,
     lr=args.lr,
@@ -172,12 +204,15 @@ if __name__ == '__main__':
 
   s0, info0 = environment.reset()
 
+  start_state = environment.official_start_obs
+  start_info = environment.official_start_info
+
   goal_info_dict = dict(player_pos=determine_goal_pos(environment))
   goal_observation = np.zeros_like(s0)
 
   success_rates = []
 
-  run(
+  run_with_eval(
     rainbow_agent,
     environment,
     args.n_iterations,

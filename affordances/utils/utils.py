@@ -91,3 +91,9 @@ def set_random_seed(seed):
   random.seed(seed)
   np.random.seed(seed)
   torch.manual_seed(seed)
+
+
+def softmax(scores, temperature):
+  from scipy import special
+  assert temperature > 0, temperature
+  return special.softmax(scores / temperature)

@@ -6,6 +6,7 @@ import torch.nn.functional as F
 from affordances.utils import utils
 from pfrl.nn.atari_cnn import SmallAtariCNN
 from torch.utils.data import Dataset, DataLoader
+from affordances.init_learners.gvf.init_gvf import GoalConditionedInitiationGVF
 
 
 class ImageCNN(torch.nn.Module):
@@ -73,6 +74,24 @@ class Classifier:
     if n_positives > 0:
       pos_weight = (1. * n_negatives) / n_positives
       return torch.as_tensor(pos_weight).float()
+  
+  @torch.no_grad()
+  def determine_instance_weights(
+    self,
+    states: np.ndarray,
+    labels: torch.Tensor,
+    init_gvf: GoalConditionedInitiationGVF,
+    goal: np.ndarray
+  ):
+    goals = np.repeat(goal[np.newaxis, ...], repeats=len(states), axis=0)
+    assert isinstance(states, np.ndarray), 'Conversion done in TD(0)'
+    assert isinstance(goal, np.ndarray), 'Conversion done in TD(0)'
+    assert states.dtype == goals.dtype == np.uint8, 'Preprocessing done in TD(0)'
+    values = init_gvf.get_values(states, goals)
+    values = utils.tensorfy(values, self.device)  # TODO(ab): keep these on GPU
+    weights = values.clip(0., 1.)
+    weights[labels == 0] = 1. - weights[labels == 0]
+    return weights
 
   def should_train(self, y):
     enough_data = len(y) > self.batch_size
@@ -83,7 +102,7 @@ class Classifier:
   def preprocess_batch(self, X):
     raise NotImplementedError
 
-  def fit(self, X, y, n_epochs=1):
+  def fit(self, X, y, initiation_gvf=None, goal=None, n_epochs=1):
     dataset = ClassifierDataset(X, y)
     dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
 
@@ -91,7 +110,7 @@ class Classifier:
       losses = []
 
       for _ in range(n_epochs):
-        epoch_loss = self._train(dataloader)                
+        epoch_loss = self._train(dataloader, initiation_gvf, goal)                
         losses.append(epoch_loss)
       
       self.is_trained = True
@@ -99,11 +118,13 @@ class Classifier:
       mean_loss = np.mean(losses)
       self.losses.append(mean_loss)
 
-  def _train(self, loader):
+  def _train(self, loader, initiation_gvf=None, goal=None):
     """ Single epoch of training. """
+    weights = None
     batch_losses = []
 
-    for sampled_inputs, sampled_labels in loader:
+    for sample in loader:
+      sampled_inputs, sampled_labels = sample[0], sample[1]
       sampled_inputs = utils.tensorfy(sampled_inputs, self.device)
       sampled_inputs = self.preprocess_batch(sampled_inputs)
       sampled_labels = sampled_labels.to(self.device)
@@ -114,12 +135,20 @@ class Classifier:
       if not pos_weight:
         continue
 
+      if initiation_gvf is not None:
+        weights = self.determine_instance_weights(
+          sample[0].numpy(), # DataLoader converts to tensor, undoing that here
+          sampled_labels,  # This is a tensor on the GPU
+          initiation_gvf, goal
+        )
+
       logits = self.model(sampled_inputs)
       
       loss = F.binary_cross_entropy_with_logits(
         logits.squeeze(),
         sampled_labels,
-        pos_weight=pos_weight
+        pos_weight=pos_weight,
+        weight=weights
       ) 
 
       self.optimizer.zero_grad()

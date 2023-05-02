@@ -54,7 +54,7 @@ class BinaryInitiationClassifier(InitiationClassifier):
     else:
       self.negative_examples.append(examples)
 
-  def update(self):
+  def update(self, initiation_gvf=None, goal=None):
     if self.positive_examples and self.negative_examples:
       pos_examples = list(itertools.chain.from_iterable(self.positive_examples))
       neg_examples = list(itertools.chain.from_iterable(self.negative_examples))
@@ -69,7 +69,7 @@ class BinaryInitiationClassifier(InitiationClassifier):
       Y = torch.cat((positive_labels, negative_labels), dim=0)
 
       if self.classifier.should_train(Y):
-        self.classifier.fit(X, Y)
+        self.classifier.fit(X, Y, initiation_gvf, goal)
 
   def save(self, filename: str):
     torch.save(self.classifier.model.state_dict(), filename)
