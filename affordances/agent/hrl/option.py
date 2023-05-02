@@ -64,12 +64,17 @@ class Option:
       # Information for logging and debugging
       self.debug_log = collections.defaultdict(list)
 
+      if hasattr(subgoal_obs, '_frames'):
+        image_dim = subgoal_obs._frames[0].squeeze().shape[0]
+      else:
+        image_dim = subgoal_obs.shape[-1]
+
       self.initiation_classifier = ConvInitiationClassifier(
         device=uvfa_policy.device,
         optimistic_threshold=self._optimistic_threshold,
         pessimistic_threshold=0.75,
         n_input_channels=1,
-        image_dim=subgoal_obs._frames[0].squeeze().shape[0],  # TODO
+        image_dim=image_dim,
         only_reweigh_negative_examples=only_reweigh_negative_examples,
         maxlen=self._maxlen,
         n_epochs=self._n_epochs
@@ -213,10 +218,15 @@ class Option:
       self.initiation_classifier.update()
   
   def get_augmented_state(self, state, goal):
-    assert isinstance(goal, atari_wrappers.LazyFrames), type(goal)
-    assert isinstance(state, atari_wrappers.LazyFrames), type(state)
-    features = list(state._frames) + [goal._frames[-1]]
-    return atari_wrappers.LazyFrames(features, stack_axis=0)
+    if isinstance(state, atari_wrappers.LazyFrames):
+      assert isinstance(goal, atari_wrappers.LazyFrames), type(goal)
+      assert isinstance(state, atari_wrappers.LazyFrames), type(state)
+      features = list(state._frames) + [goal._frames[-1]]
+      return atari_wrappers.LazyFrames(features, stack_axis=0)
+    assert isinstance(state, np.ndarray), type(state)
+    assert isinstance(goal, np.ndarray), type(goal)
+    assert state.shape == goal.shape == (1, 84, 84), (state.shape, goal.shape)
+    return np.concatenate((state, goal), axis=0)
   
   def log_progress(self, info, success, goal_info):
     self.debug_log['timesteps'].append(info['timestep'])

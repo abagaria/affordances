@@ -77,7 +77,11 @@ class ConvClassifier:
     init_gvf: GoalConditionedInitiationGVF,
     goal: np.ndarray
   ):
-    goals = np.repeat(goal._frames[-1], repeats=len(states), axis=0)
+    def extract_frame(state):
+      if hasattr(state, '_frames'):
+        return state._frames[-1]
+      return state
+    goals = np.repeat(extract_frame(goal), repeats=len(states), axis=0)
     assert isinstance(states, np.ndarray), 'Conversion done in TD(0)'
     assert isinstance(goals, np.ndarray), 'Conversion done in TD(0)'
     assert states.dtype == goals.dtype == np.uint8, 'Preprocessing done in TD(0)'

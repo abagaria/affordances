@@ -53,7 +53,7 @@ class AgentOverOptions:
       env_steps, epsilon_decay_steps, final_epsilon)
     
     self.initiation_gvf = self.create_initiation_learner()
-    self.subgoals = self.get_subgoals()
+    self.subgoals = self.minigrid_get_subgoals(randomize_direction=False)  # TODO(ab)
     self.options = self.create_options()  # TODO: create global option
 
   def update_initiation_gvf(self, episode_duration):
@@ -98,13 +98,32 @@ class AgentOverOptions:
   def get_subgoal_positions_for_13x13_gridworld(self):
     return [(0,12), (12,0), (6,6), (12,12)]
  
-  def get_subgoals(self):
+  def get_subgoals(self):  # for montezuma
     pos2goals = {}  # pos -> (obs, info)
     for state_dict in self._rams:
       pos = state_dict['player_pos']
       obs, info = self._env.reset(ram=state_dict['ram'], state=state_dict['state'])
       pos2goals[pos] = (obs, info)
     return pos2goals
+  
+  def minigrid_get_subgoals(self, randomize_direction):
+    pos2goals = {}  # pos -> (obs, info)
+    for state_dict in self._rams:
+      pos = state_dict['player_pos']
+      obs, info = self._env.reset_to(
+        pos,
+        randomize_direction=randomize_direction
+      )
+      pos2goals[pos] = (obs, info)
+    return pos2goals
+  
+  def door_key_get_goal_classifiers(self):
+    from affordances.domains.minigrid import minigrid_doorkey_subgoals
+    goal_attainment_classifiers = []
+    for subgoal_dict in minigrid_doorkey_subgoals(self._env):
+      clf = DiscreteInfoAttainmentClassifier(list(subgoal_dict.keys())[0])
+      goal_attainment_classifiers.append(clf)
+    return goal_attainment_classifiers
 
   def create_options(self) -> list:
     options = []

@@ -40,7 +40,14 @@ class ConvInitiationClassifier(InitiationClassifier):
 
   def _predict(self, states: np.ndarray, threshold) -> np.ndarray:
     # TODO: This converts lz -> np.array. Do this in one place.
-    states = [state._frames[-1] for state in states]  
+    def extract_frame(state):
+      if hasattr(state, '_frames'):
+        return state._frames[-1]
+      assert isinstance(state, np.ndarray), type(state)
+      frame = state[np.newaxis, 0, ...] if state.shape == (2, 84, 84) else state
+      assert frame.shape == (1, 84, 84), frame.shape
+      return frame
+    states = [extract_frame(state) for state in states]
     state_tensor = utils.tensorfy(states, self.device)
     preprocessed_tensor = state_tensor / 255.
     predictions = self.classifier.predict(preprocessed_tensor, threshold)

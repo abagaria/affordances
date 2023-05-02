@@ -18,6 +18,8 @@ class MinigridInfoWrapper(Wrapper):
     # Store the test-time start state when the environment is constructed
     self.official_start_obs, self.official_start_info = self.reset()
 
+    self.no_op_action = env.action_space.n - 2
+
   def reset(self):
     obs, info = self.env.reset()
     info = self._modify_info_dict(info)
@@ -43,6 +45,24 @@ class MinigridInfoWrapper(Wrapper):
       assert self.unwrapped.carrying.type == 'key', self.env.unwrapped.carrying
     info['door_open'] = determine_is_door_open(self)
     return info
+  
+  def reset_to(self, rand_pos, randomize_direction=False):
+    self.reset()
+
+    new_pos = self.env.place_agent(
+      top=rand_pos,
+      size=(1, 1),
+      rand_dir=randomize_direction
+    )
+
+    # Apply the no-op to get the observation image
+    obs, _, _, _, info = self.env.step(self.no_op_action)
+
+    info['player_x'] = new_pos[0]
+    info['player_y'] = new_pos[1]
+    info['player_pos'] = new_pos
+    
+    return obs, info
 
 
 class ResizeObsWrapper(ObservationWrapper):
@@ -162,6 +182,36 @@ def determine_is_door_open(env):
       tile = env.grid.get(i, j)
       if isinstance(tile, Door):
         return tile.is_open
+
+
+def get_open_grid_positions(env):
+  from minigrid.core.world_object import Wall
+  from minigrid.core.world_object import Goal
+  from minigrid.core.world_object import Door
+  from minigrid.core.world_object import Key
+  open_positions = []
+  for i in range(env.grid.width):
+    for j in range(env.grid.height):
+      tile = env.grid.get(i, j)
+      if not isinstance(tile, (Wall, Goal, Key, Door)):
+          open_positions.append((i, j))
+  return open_positions
+
+
+def four_rooms_get_room_centers():
+  return [(5, 5), (14, 5), (5, 14), (14, 14)]
+
+
+def minigrid_open_grid_subgoals():
+  return [(3, 3), (5, 5)]
+
+
+def minigrid_doorkey_subgoals(env):
+  return [
+    {'has_key': True},  # get the key
+    {'door_open': True},  # open the door
+    {'player_pos': determine_goal_pos(env)}  # go to the goal
+  ]
 
 
 def environment_builder(
