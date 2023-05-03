@@ -46,13 +46,15 @@ class Classifier:
         device,
         threshold=0.5,
         batch_size=32,
-        lr=1e-3):
+        lr=1e-3,
+        only_reweigh_negative_examples=True):
     
     self.device = device
     self.is_trained = False
     self.threshold = threshold
     self.batch_size = batch_size
     self.optimizer = torch.optim.Adam(self.model.parameters(), lr=lr)
+    self.only_reweigh_negative_examples = only_reweigh_negative_examples
 
     # Debug variables
     self.losses = []
@@ -85,12 +87,14 @@ class Classifier:
     init_gvf: GoalConditionedInitiationGVF,
     goal: Optional[np.ndarray]
   ):
+
+    # TODO: (ba) assumes np.float32 states 
     assert isinstance(states, np.ndarray), 'Conversion done in TD(0)'
-    assert states.dtype == np.uint8, 'Preprocessing done in TD(0)'
+    assert states.dtype == np.float32, 'Preprocessing done in TD(0)'
     if goal is not None:
       goals = np.repeat(goal[np.newaxis, ...], repeats=len(states), axis=0)
       assert isinstance(goal, np.ndarray), 'Conversion done in TD(0)'
-      assert goals.dtype == np.uint8, 'Preprocessing done in TD(0)'
+      # assert goals.dtype == np.uint8, 'Preprocessing done in TD(0)'
       values = init_gvf.get_values(states, goals)
     else:
       values = init_gvf.get_values(states)
@@ -98,6 +102,10 @@ class Classifier:
     values = utils.tensorfy(values, self.device)  # TODO(ab): keep these on GPU
     weights = values.clip(0., 1.)
     weights[labels == 0] = 1. - weights[labels == 0]
+
+    if self.only_reweigh_negative_examples:
+      values[labels == 1] = 1.
+      # else values[labels==1] are already = V(s), which is what we want
     return weights
 
   def should_train(self, y):
@@ -173,10 +181,13 @@ class ConvClassifier(Classifier):
         threshold=0.5,
         n_input_channels=1,
         batch_size=32,
-        lr=1e-3):
+        lr=1e-3,
+        only_reweigh_negative_examples=True):
 
     self.model = ImageCNN(n_input_channels).to(device)
-    super().__init__(device=device, threshold=threshold, batch_size=batch_size, lr=lr)
+    super().__init__(device=device, threshold=threshold, batch_size=batch_size, lr=lr,
+      only_reweigh_negative_examples=only_reweigh_negative_examples
+    )
 
   def preprocess_batch(self, X):
     assert X.dtype == torch.uint8, X.dtype
@@ -189,10 +200,13 @@ class MlpClassifier(Classifier):
         input_dim,
         threshold=0.5,
         batch_size=32,
-        lr=1e-3):
+        lr=1e-3,
+        only_reweigh_negative_examples=True):
 
     self.model = MLP(input_dim).to(device)
-    super().__init__(device=device, threshold=threshold, batch_size=batch_size, lr=lr)
+    super().__init__(device=device, threshold=threshold, batch_size=batch_size, lr=lr,
+      only_reweigh_negative_examples=only_reweigh_negative_examples
+    )
 
   def preprocess_batch(self, X):
     return X

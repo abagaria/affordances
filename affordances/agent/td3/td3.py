@@ -71,6 +71,9 @@ class TD3:
   def act(self, obs):
     return self.agent.act(obs)
 
+  def get_actions(self, obs):
+    return self.agent.policy(obs).sample()
+
   def _overwrite_pfrl_state(self, state, action):
     """ Hack the pfrl state so that we can call act() consecutively during an episode before calling step(). """
     self.agent.batch_last_obs = [state]

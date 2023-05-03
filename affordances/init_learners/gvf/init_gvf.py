@@ -1,3 +1,4 @@
+import ipdb
 import torch
 import numpy as np
 
@@ -6,7 +7,8 @@ from pfrl.replay_buffers.prioritized import PrioritizedReplayBuffer
 
 from affordances.utils import utils
 from affordances.init_learners.init_learner import InitiationLearner
-from affordances.agent.td.td_policy_eval import TDPolicyEvaluator
+
+from affordances.agent.td.td_policy_eval import ContinuousTDPolicyEvaluator
 
 
 class InitiationGVF(InitiationLearner):
@@ -21,12 +23,10 @@ class InitiationGVF(InitiationLearner):
       optimistic_threshold: float = 0.7,
       pessimistic_threshold: float = 0.8,
       use_prioritized_buffer: bool = True,
-      init_replay_capacity: int = 100_000,
-      use_mlp: bool = False):
+      init_replay_capacity: int = 100_000):
     super().__init__()
     self._n_actions = n_actions
     self._n_input_channels = n_input_channels
-    self._use_mlp = use_mlp
 
     # Function that maps batch of states to batch of actions (`batch_act()`)
     self.target_policy = target_policy
@@ -38,11 +38,10 @@ class InitiationGVF(InitiationLearner):
     buffer_cls = PrioritizedReplayBuffer if use_prioritized_buffer else ReplayBuffer
     self.initiation_replay_buffer = buffer_cls(init_replay_capacity)
 
-    self.policy_evaluation_module = TDPolicyEvaluator(
+    self.policy_evaluation_module = ContinuousTDPolicyEvaluator(
       self.initiation_replay_buffer,
       n_actions=n_actions,
-      n_input_channels=n_input_channels,
-      use_mlp=use_mlp
+      n_input_channels=n_input_channels
     )
 
   def add_trajectory_to_replay(self, transitions):
@@ -57,13 +56,13 @@ class InitiationGVF(InitiationLearner):
       )
   
   def optimistic_predict(self, states: np.ndarray, bonuses=None) -> np.ndarray:
-    values = self.policy_evaluation_module.get_values(states)
+    values = self.policy_evaluation_module.get_values(states, self.target_policy)
     if bonuses is not None:
       values += bonuses
     return values > self.optimistic_threshold
 
   def pessimistic_predict(self, states: np.ndarray) -> np.ndarray:
-    values = self.policy_evaluation_module.get_values(states)
+    values = self.policy_evaluation_module.get_values(states, self.target_policy)
     return values > self.pessimistic_threshold
   
   def update(self, n_updates: int = 1):
@@ -86,8 +85,8 @@ class InitiationGVF(InitiationLearner):
   def load(self, filename: str):
     buffer_cls = type(self.initiation_replay_buffer)
     replay = buffer_cls(self.initiation_replay_buffer.capacity)
-    self.policy_evaluation_module = TDPolicyEvaluator(
-      replay, self._n_actions, self._n_input_channels, use_mlp=self._use_mlp)
+    self.policy_evaluation_module = ContinuousTDPolicyEvaluator(
+      replay, self._n_actions, self._n_input_channels)
     replay.load(filename.replace('.pth', '.pkl'))
 
     model_dict = torch.load(filename)
@@ -99,7 +98,7 @@ class InitiationGVF(InitiationLearner):
     )
 
   def get_values(self, states):
-    return self.policy_evaluation_module.get_values(states)
+    return self.policy_evaluation_module.get_values(states, self.target_policy)
 
 class GoalConditionedInitiationGVF(InitiationGVF):
   def get_values(self, states, goals):

@@ -46,10 +46,9 @@ def create_init_learner(args, env):
 
 def create_gvf(args, env, agent):
   return InitiationGVF(
-    agent.agent.batch_act, 
+    agent.get_actions, 
     env.action_space.shape[0],
     env.observation_space.shape[0],
-    use_mlp=True
   )
 
 def create_sample_func(args):
@@ -79,6 +78,7 @@ def train(agent: TD3, init_learner, sample_func, env, n_episodes, init_gvf):
   # qpos_per_grasp = 1 if env.optimal_ik else 5
   qpos_per_grasp = 1
   print('TEMPORARY 1 QPOS')
+  breakpoint()
   grasps = env.load_grasps()
   grasp_state_vectors, grasp_qpos = env.get_states_from_grasps(n=qpos_per_grasp)
   print('-- got grasps --')
