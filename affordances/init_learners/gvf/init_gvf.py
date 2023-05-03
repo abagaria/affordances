@@ -100,6 +100,10 @@ class InitiationGVF(InitiationLearner):
   def get_values(self, states):
     return self.policy_evaluation_module.get_values(states, self.target_policy)
 
+  def score(self, states):
+    scores = self.policy_evaluation_module.get_values(states, self.target_policy)
+    return scores.reshape(-1).cpu().numpy()
+
 class GoalConditionedInitiationGVF(InitiationGVF):
   def get_values(self, states, goals):
     augmented_states = np.concatenate((states, goals), axis=1)

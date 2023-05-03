@@ -30,7 +30,7 @@ def create_agent(
     )
     return TD3(action_space, **kwargs)
 
-def create_init_learner(args, env):
+def create_init_learner(args, env, agent):
   if args.init_learner == "random":
     return RandomGraspBaseline()
   elif "binary" in args.init_learner:
@@ -40,7 +40,7 @@ def create_init_learner(args, env):
     pessimistic_threshold=0.75,
     return MlpInitiationClassifier(device, optimistic_threshold, pessimistic_threshold, input_dim, maxlen=100)
   elif args.init_learner == "gvf":
-    return None # TODO
+    return create_gvf(args, env, agent)
   else:
     raise ValueError("invalid init_learner")
 
@@ -75,10 +75,7 @@ def train(agent: TD3, init_learner, sample_func, env, n_episodes, init_gvf):
   episodic_success = []
   n_steps = 0
   
-  # qpos_per_grasp = 1 if env.optimal_ik else 5
-  qpos_per_grasp = 1
-  print('TEMPORARY 1 QPOS')
-  breakpoint()
+  qpos_per_grasp = 1 if env.optimal_ik else 5
   grasps = env.load_grasps()
   grasp_state_vectors, grasp_qpos = env.get_states_from_grasps(n=qpos_per_grasp)
   print('-- got grasps --')
@@ -117,16 +114,18 @@ def train(agent: TD3, init_learner, sample_func, env, n_episodes, init_gvf):
     grasp_success[selected_idx]+=info['success']
     print(f'Episode {episode} Reward {episode_reward} Success {success}')
 
+    # maybe update gvf
     if init_gvf is not None:
-      # TODO: relabel
       init_gvf.add_trajectory_to_replay(relabel_trajectory(trajectory))
       init_gvf.update()
     
-    init_learner.add_trajectory(trajectory, success)
-    if type(init_learner) is MlpInitiationClassifier:
-      init_learner.update(initiation_gvf=init_gvf)
-    else:
+    # update init_learner
+    if type(init_learner) is InitiationGVF:
+      init_learner.add_trajectory_to_replay(relabel_trajectory(trajectory))
       init_learner.update()
+    else:
+      init_learner.add_trajectory(trajectory, success)
+      init_learner.update(initiation_gvf=init_gvf)
 
     if episode > 0 and episode % 10 == 0:
       utils.safe_zip_write(
@@ -136,7 +135,7 @@ def train(agent: TD3, init_learner, sample_func, env, n_episodes, init_gvf):
             success=episodic_success,
             current_episode=episode,
             current_step_count=n_steps,
-            classifier_loss=init_learner.classifier.losses if type(init_learner) is not RandomGraspBaseline else [],
+            classifier_loss=init_learner.classifier.losses if type(init_learner) is MlpInitiationClassifier else [],
             scores=grasp_scores,
             counts=grasp_counts,
             grasp_success=grasp_success
@@ -194,7 +193,7 @@ if __name__ == '__main__':
     sigma=args.sigma
   )
 
-  init_learner = create_init_learner(args, env)
+  init_learner = create_init_learner(args, env, td3_agent)
   sample_func = create_sample_func(args)
 
   if args.init_learner == "weighted-binary":

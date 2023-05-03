@@ -5,7 +5,7 @@ class RandomGraspBaseline:
     n_states = len(states)
     return np.random.rand(n_states)
 
-  def update(self):
+  def update(self, initiation_gvf=None):
     pass 
 
   def add_trajectory(self, transitions, success):
