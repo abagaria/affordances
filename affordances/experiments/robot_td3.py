@@ -201,3 +201,7 @@ if __name__ == '__main__':
   else:
     init_gvf = None
   returns = train(td3_agent, init_learner, sample_func, env, args.n_episodes, init_gvf)
+
+  init_learner_fname = os.path.join(g_log_dir, 'init.pth')
+  init_learner.save(init_learner_fname)
+  td3_agent.agent.save(g_log_dir)
