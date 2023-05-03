@@ -1,3 +1,5 @@
+from typing import Optional
+
 import torch
 import random
 import numpy as np
@@ -81,13 +83,18 @@ class Classifier:
     states: np.ndarray,
     labels: torch.Tensor,
     init_gvf: GoalConditionedInitiationGVF,
-    goal: np.ndarray
+    goal: Optional[np.ndarray]
   ):
-    goals = np.repeat(goal[np.newaxis, ...], repeats=len(states), axis=0)
     assert isinstance(states, np.ndarray), 'Conversion done in TD(0)'
-    assert isinstance(goal, np.ndarray), 'Conversion done in TD(0)'
-    assert states.dtype == goals.dtype == np.uint8, 'Preprocessing done in TD(0)'
-    values = init_gvf.get_values(states, goals)
+    assert states.dtype == np.uint8, 'Preprocessing done in TD(0)'
+    if goal is not None:
+      goals = np.repeat(goal[np.newaxis, ...], repeats=len(states), axis=0)
+      assert isinstance(goal, np.ndarray), 'Conversion done in TD(0)'
+      assert goals.dtype == np.uint8, 'Preprocessing done in TD(0)'
+      values = init_gvf.get_values(states, goals)
+    else:
+      values = init_gvf.get_values(states)
+    
     values = utils.tensorfy(values, self.device)  # TODO(ab): keep these on GPU
     weights = values.clip(0., 1.)
     weights[labels == 0] = 1. - weights[labels == 0]

@@ -28,6 +28,21 @@ class QNetwork(torch.nn.Module):
   def forward(self, x):
     return self.model(x.float())
 
+class MlpQNetwork(torch.nn.Module):
+  def __init__(self, input_dim, n_actions):
+    super().__init__()
+
+    self.model = torch.nn.Sequential(
+      pfrl.nn.ConcatObsAndAction(),
+      torch.nn.Linear(in_features=input_dim + n_actions, out_features=256),
+      torch.nn.ReLU(),
+      torch.nn.Linear(in_features=256, out_features=256),
+      torch.nn.ReLU(),
+      torch.nn.Linear(in_features=256, out_features=1)
+    )
+
+  def forward(self, x):
+    return self.model(x.float())
 
 class TDPolicyEvaluator:
   """Policy evaluation using 1-step temporal difference errors."""
@@ -61,7 +76,7 @@ class TDPolicyEvaluator:
     self._batch_size = batch_size
     self._learning_rate = learning_rate
     self._maintain_prioritized_buffer = isinstance(replay, PrioritizedReplayBuffer)
-
+    
     self._online_q_network = QNetwork(n_input_channels, n_actions)
     self._target_q_network = copy.deepcopy(self._online_q_network).eval().requires_grad_(False)
 

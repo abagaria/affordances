@@ -11,6 +11,7 @@ from affordances.domains.cip_env_wrapper import make_robosuite_env
 
 from affordances.init_learners.classification.binary_init_classifier import MlpInitiationClassifier
 from affordances.init_learners.classification.random_grasp_baseline import RandomGraspBaseline
+from affordances.init_learners.gvf.init_gvf import InitiationGVF
 
 def create_agent(
   action_space, 
@@ -32,12 +33,24 @@ def create_agent(
 def create_init_learner(args, env):
   if args.init_learner == "random":
     return RandomGraspBaseline()
-  elif args.init_learner == "binary":
+  elif "binary" in args.init_learner:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     input_dim = env.observation_space.shape[0]
     optimistic_threshold=0.5,
     pessimistic_threshold=0.75,
     return MlpInitiationClassifier(device, optimistic_threshold, pessimistic_threshold, input_dim, maxlen=100)
+  elif args.init_learner == "gvf":
+    return None # TODO
+  else:
+    raise ValueError("invalid init_learner")
+
+def create_gvf(args, env, agent):
+  return InitiationGVF(
+    agent.agent.batch_act, 
+    env.action_space.shape[0],
+    env.observation_space.shape[0],
+    use_mlp=True
+  )
 
 def create_sample_func(args):
   """ given a list of scores, return index chosen """
@@ -48,13 +61,24 @@ def create_sample_func(args):
   else:
     raise ValueError("args.sampler is invalid [max, soft]")
 
+def relabel_trajectory(transitions):
+  relabeled_trajectory = []
+  for state, action, _, next_state, info in transitions:
+    reached = info['success']
+    reward = float(reached)
+    relabeled_trajectory.append((state, action, reward, next_state, reached, info))
+    if reached:
+      break
+  return relabeled_trajectory
 
-def train(agent: TD3, init_learner, sample_func, env, n_episodes):
+def train(agent: TD3, init_learner, sample_func, env, n_episodes, init_gvf):
   episodic_rewards = []
   episodic_success = []
   n_steps = 0
   
-  qpos_per_grasp = 1 if env.optimal_ik else 5
+  # qpos_per_grasp = 1 if env.optimal_ik else 5
+  qpos_per_grasp = 1
+  print('TEMPORARY 1 QPOS')
   grasps = env.load_grasps()
   grasp_state_vectors, grasp_qpos = env.get_states_from_grasps(n=qpos_per_grasp)
   print('-- got grasps --')
@@ -92,9 +116,17 @@ def train(agent: TD3, init_learner, sample_func, env, n_episodes):
     grasp_counts[selected_idx]+=1
     grasp_success[selected_idx]+=info['success']
     print(f'Episode {episode} Reward {episode_reward} Success {success}')
+
+    if init_gvf is not None:
+      # TODO: relabel
+      init_gvf.add_trajectory_to_replay(relabel_trajectory(trajectory))
+      init_gvf.update()
     
     init_learner.add_trajectory(trajectory, success)
-    init_learner.update()
+    if type(init_learner) is MlpInitiationClassifier:
+      init_learner.update(initiation_gvf=init_gvf)
+    else:
+      init_learner.update()
 
     if episode > 0 and episode % 10 == 0:
       utils.safe_zip_write(
@@ -164,4 +196,9 @@ if __name__ == '__main__':
 
   init_learner = create_init_learner(args, env)
   sample_func = create_sample_func(args)
-  returns = train(td3_agent, init_learner, sample_func, env, args.n_episodes)
+
+  if args.init_learner == "weighted-binary":
+    init_gvf = create_gvf(args, env, td3_agent)
+  else:
+    init_gvf = None
+  returns = train(td3_agent, init_learner, sample_func, env, args.n_episodes, init_gvf)
