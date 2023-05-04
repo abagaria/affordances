@@ -84,8 +84,8 @@ if __name__ == '__main__':
   parser.add_argument('--log_dir', type=str, default='/gpfs/data/gdk/abagaria/affordances_logs')
   parser.add_argument('--sampler', type=str, default='soft')
   parser.add_argument('--init_learner', type=str, default='binary')
-  parser.add_argument('--optimal_ik', type=utils.boolify, default=True)
-  parser.add_argument('--segment', type=utils.boolify, default=True)
+  parser.add_argument('--optimal_ik', type=utils.boolify, default=False)
+  parser.add_argument('--segment', type=utils.boolify, default=False)
   parser.add_argument('--render', type=utils.boolify, default=False)
   parser.add_argument('--vis_init_set', type=utils.boolify, default=True)
   args = parser.parse_args()
@@ -151,7 +151,7 @@ if __name__ == '__main__':
     episode_reward = 0.
 
     grasp_scores = init_learner.score(grasp_state_vectors)
-    if args.vis_init_set and episode % 10 == 0:
+    if args.init_learner != "random" and args.vis_init_set and episode % 500 == 0:
       mask = grasp_scores > init_learner.optimistic_threshold
       env.reset()
       env.render_states(grasp_qpos[mask], ep_num=episode, fpath=g_log_dir)
