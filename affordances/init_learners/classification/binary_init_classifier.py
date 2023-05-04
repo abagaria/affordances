@@ -115,7 +115,7 @@ class MlpInitiationClassifier(BinaryInitiationClassifier):
     )
 
   def load(self, filename: str):
-    self.classifier = MlpClassifier(self.device, None, self.input_dim)
+    self.classifier = MlpClassifier(self.device, self.input_dim)
     self.classifier.model.load_state_dict(
       torch.load(filename)
     )

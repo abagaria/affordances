@@ -44,7 +44,7 @@ def make_robosuite_env(task,
     raw_env = suite.make(
         **options,
         has_renderer=render,
-        has_offscreen_renderer=True,
+        has_offscreen_renderer=not render,
         use_camera_obs=False,
         reward_shaping=True,
     )
