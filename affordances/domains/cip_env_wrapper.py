@@ -1,6 +1,7 @@
 import os 
 import copy 
 import pickle 
+from PIL import Image
 
 import gym
 import numpy as np 
@@ -43,7 +44,7 @@ def make_robosuite_env(task,
     raw_env = suite.make(
         **options,
         has_renderer=render,
-        has_offscreen_renderer=False,
+        has_offscreen_renderer=True,
         use_camera_obs=False,
         reward_shaping=True,
     )
@@ -227,9 +228,31 @@ class RobotEnvWrapper(gym.ObservationWrapper):
         info["needs_reset"] = done
         return obs, reward, done, info
 
+    def render_states(self, states, vis=False, fpath=None, ep_num=0):
+        for i, state in enumerate(states):
+            self.reset_to_qpos(state, wide=True)
+            img = self.sim.render(
+                camera_name='frontview',
+                width=256,
+                height=256
+            )
+            img = img[::-1]
+
+            if vis:
+                plt.imshow(img)
+                plt.show()
+
+            if fpath is not None:
+                im = Image.fromarray(img)
+                fname = f"ep{str(ep_num).zfill(4)}_qpos{str(i).zfill(3)}.png"
+                im.save(os.path.join(fpath, fname))
+
 
 if __name__ == '__main__':
 
+    import matplotlib.pyplot as plt
+    plt.figure()
+    plt.close()
     from affordances.utils import utils
     utils.set_random_seed(0)
 
@@ -238,12 +261,18 @@ if __name__ == '__main__':
     # env = make_robosuite_env("SlideCIP", render=True, segment=True)
     # env = make_robosuite_env("DrawerCIP", render=True, segment=True)
 
-    env = make_robosuite_env("DoorCIP", render=True, segment=False) # good
+    # env = make_robosuite_env("DoorCIP", render=True, segment=False) # good
     # env = make_robosuite_env("LeverCIP", render=True, segment=False) # good
     # env = make_robosuite_env("SlideCIP", render=True, segment=False) # good
     # env = make_robosuite_env("DrawerCIP", render=True, segment=False) # n=3
 
+    # testing rendering of init set 
+    env = make_robosuite_env("DoorCIP", render=False, segment=False) 
+    qpos_per_grasp = 1
     grasps = env.load_grasps()
+    grasp_state_vectors, grasp_qpos = env.get_states_from_grasps(n=qpos_per_grasp)
+    env.render_states(grasp_qpos, fpath="./results/dev", vis=True)
+
     for i in range(len(grasps)):
         print(i % len(grasps))
         env.reset_to(grasps[i % len(grasps)])
