@@ -18,33 +18,115 @@ EVAL_FREQ = 10
 # TASKS = ["DoorCIP", "LeverCIP", "DrawerCIP", "SlideCIP"]
 TASKS = ["DoorCIP", "LeverCIP", "SlideCIP"]
 conditions = { 
-                'Random': 
+                # 'Random': 
+                #     {
+                #         'init_learner': 'random',
+                #         'optimal_ik':IK,
+                #         'segment':False
+                #     },
+                # 'Binary':
+                #     {
+                #         'init_learner': 'binary',
+                #         'optimal_ik':IK,
+                #         'segment':False
+                #     }, 
+                # 'GVF':
+                #     {
+                #         'init_learner': 'gvf',
+                #         'optimal_ik':IK,
+                #         'segment':False
+                #     },
+                # 'Weighted':
+                #     {
+                #         'init_learner': 'weighted-binary',
+                #         'optimal_ik':IK,
+                #         'segment':False
+                #     },   
+                #  'Random-Segmented': 
+                #     {
+                #         'init_learner': 'random',
+                #         'optimal_ik':IK,
+                #         'segment':True
+                #     },
+                # 'Binary-Segmented':
+                #     {
+                #         'init_learner': 'binary',
+                #         'optimal_ik':IK,
+                #         'segment':True
+                #     }, 
+                # 'GVF-Segmented':
+                #     {
+                #         'init_learner': 'gvf',
+                #         'optimal_ik':IK,
+                #         'segment':True
+                #     },
+                # 'Weighted-Segmented':
+                #     {
+                #         'init_learner': 'weighted-binary',
+                #         'optimal_ik':IK,
+                #         'segment':True
+                #     },  
+                'Random-Optimal': 
                     {
                         'init_learner': 'random',
-                        'optimal_ik':IK
+                        'optimal_ik':True,
+                        'segment':False
                     },
-                'Binary':
+                'Binary-Optimal':
                     {
                         'init_learner': 'binary',
-                        'optimal_ik':IK
+                        'optimal_ik':True,
+                        'segment':False
                     }, 
-                'GVF':
+                'GVF-Optimal':
                     {
                         'init_learner': 'gvf',
-                        'optimal_ik':IK
+                        'optimal_ik':True,
+                        'segment':False
                     },
-                'Weighted':
+                'Weighted-Optimal':
                     {
                         'init_learner': 'weighted-binary',
-                        'optimal_ik':IK
+                        'optimal_ik':True,
+                        'segment':False
                     },   
+                # 'Random-Optimal-Seg': 
+                #     {
+                #         'init_learner': 'random',
+                #         'optimal_ik':True,
+                #         'segment':True
+                #     },
+                # 'Binary-Optimal-Seg':
+                #     {
+                #         'init_learner': 'binary',
+                #         'optimal_ik':True,
+                #         'segment':True
+                #     }, 
+                # 'GVF-Optimal-Seg':
+                #     {
+                #         'init_learner': 'gvf',
+                #         'optimal_ik':True,
+                #         'segment':True
+                #     },
+                # 'Weighted-Optimal-Seg':
+                #     {
+                #         'init_learner': 'weighted-binary',
+                #         'optimal_ik':True,
+                #         'segment':True
+                #     },   
+                # 'Oracle': 
+                #     {
+                #         'init_learner': 'random',
+                #         'optimal_ik':True,
+                #         'segment':True
+                #     },    
    
 
             }
-mask = {"optimal_ik":False,
-        "environment_name": "Door",
-        "init_learner":"binary"}
-# mask = {}
+# mask = {"optimal_ik":False,
+#         "environment_name": "Door",
+#         "init_learner":"binary"}
+mask = {}
 
 def get_data(rootDir, conditions=None, task=None, smoothen=100):
   scores = {}
@@ -75,7 +157,7 @@ def get_data(rootDir, conditions=None, task=None, smoothen=100):
       eval_files = pickle.load(gzip.open(path, "rb+"))
       eval_successes = eval_files['success']
       eval_rewards = eval_files['rewards']
-      print(len(eval_successes))
+      # print(len(eval_successes))
 
       log_df = pd.DataFrame()
       log_df['success'] = moving_average(eval_successes, n=smoothen)
