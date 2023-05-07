@@ -13,25 +13,43 @@ from affordances.utils.plotting_script import generate_plot, truncate, moving_av
 sns.set_palette('colorblind')
 sns.set(font_scale=1.5)
 
+IK = False
 EVAL_FREQ = 10 
-TASKS = ["DoorCIP", "LeverCIP", "DrawerCIP", "SlideCIP"]
+# TASKS = ["DoorCIP", "LeverCIP", "DrawerCIP", "SlideCIP"]
+TASKS = ["DoorCIP", "LeverCIP", "SlideCIP"]
 conditions = { 
                 'Random': 
                     {
                         'init_learner': 'random',
+                        'optimal_ik':IK
                     },
-
                 'Binary':
                     {
                         'init_learner': 'binary',
+                        'optimal_ik':IK
+                    }, 
+                'GVF':
+                    {
+                        'init_learner': 'gvf',
+                        'optimal_ik':IK
+                    },
+                'Weighted':
+                    {
+                        'init_learner': 'weighted-binary',
+                        'optimal_ik':IK
                     },   
+   
+
             }
-# mask = {"environment_name":"Door"}
+mask = {"optimal_ik":False,
+        "environment_name": "Door",
+        "init_learner":"binary"}
 # mask = {}
 
-def get_data(rootDir, conditions=None, task=None, smoothen=10):
+def get_data(rootDir, conditions=None, task=None, smoothen=100):
   scores = {}
   runs = []
+  count=0
   if conditions is not None:
     for condition in conditions.keys():
       scores[condition] = []
@@ -50,7 +68,7 @@ def get_data(rootDir, conditions=None, task=None, smoothen=10):
         if job_data['environment_name'] != task:
           continue
 
-      print('Found run: %s' % dirName)
+      # print('Found run: %s' % dirName)
 
       # if we find a log, read into dataframe
       path = os.path.join(dirName,fname)
@@ -63,7 +81,7 @@ def get_data(rootDir, conditions=None, task=None, smoothen=10):
       log_df['success'] = moving_average(eval_successes, n=smoothen)
       log_df['reward'] = moving_average(eval_rewards, n=smoothen)
       log_df['episode'] = np.arange(len(log_df)) + EVAL_FREQ
-      log_df['tag']=path
+      log_df['tag']=str(count)
       for key, val in job_data.items():
         if key == "environment_name":
           job_data[key] = job_data[key][:-3]
@@ -80,6 +98,8 @@ def get_data(rootDir, conditions=None, task=None, smoothen=10):
       else:
         runs.append(log_df)
 
+      count+=1
+
   data = pd.concat(runs)
   return data, scores
 
@@ -88,37 +108,48 @@ if __name__ == '__main__':
   parser.add_argument('path', type=str)
   args = parser.parse_args()
 
-  data, scores = get_data(args.path, conditions=conditions)
-  y_var = "success"
-  g = sns.relplot(x='episode',
-                  y=y_var, 
-                  kind='line',
-                  data=data,
-                  alpha=0.8,
-                  hue="condition",
-                  hue_order=conditions.keys(),
-                  col="environment_name",
-                  row="optimal_ik",
-                  facet_kws={"sharex":False,"sharey":True},
-                  errorbar="se"
-  )
-  g.set_titles(col_template = '{col_name}')
-  g.set_axis_labels( "Episode" , y_var)
-  plt.savefig(f'{args.path}/{y_var}.svg')
-  plt.savefig(f'{args.path}/{y_var}.png')
-  plt.show()
+  # data, scores = get_data(args.path, conditions=conditions)
+  # for key, val in mask.items():
+  #   data = data[ data[key] == val ]
+
+  # y_var = "success"
+  # g = sns.relplot(x='episode',
+  #                 y=y_var, 
+  #                 kind='line',
+  #                 data=data,
+  #                 alpha=0.8,
+  #                 hue="condition",
+  #                 hue_order=conditions.keys(),
+  #                 col="environment_name",
+  #                 # row="segment",
+  #                 # style="optimal_ik",
+  #                 row="optimal_ik",
+  #                 facet_kws={"sharex":False,"sharey":True},
+  #                 errorbar="se"
+  # )
+  # g.set_titles(col_template = '{col_name}')
+  # g.set_axis_labels( "Episode" , y_var)
+  # plt.savefig(f'{args.path}/{y_var}.svg')
+  # plt.savefig(f'{args.path}/{y_var}.png')
+  # plt.show()
   
 
   # Akhil's logic: 
-  # for i, task in enumerate(TASKS):
-  #   scores =get_data(args.path, conditions=conditions, task=task)
-  #   for pattern, score_lists in scores.items():
-  #     score_lists = truncate(score_lists, max_length=500)
-  #     score_array = np.asarray(score_lists)
-  #     label = pattern[2:] if pattern[:2] == '__' else pattern
-  #     generate_plot(score_array, label, smoothen=10, all_seeds=False)
+  for i, task in enumerate(TASKS):
 
-  #   plt.title(task)
-  #   plt.legend()
-  #   plt.savefig(os.path.join(args.path, f'{task}.png'))
-  #   plt.show()   
+    data, scores =get_data(args.path, conditions=conditions, task=task)
+    for pattern, score_lists in scores.items():
+
+      try:
+        min_length = min([len(arr) for arr in score_lists])
+        score_lists = truncate(score_lists, max_length=min_length)
+        score_array = np.asarray(score_lists)
+        label = pattern[2:] if pattern[:2] == '__' else pattern
+        generate_plot(score_array, label, smoothen=100, all_seeds=False)
+      except Exception as e:
+        print(e)
+
+    plt.title(task)
+    plt.legend()
+    plt.savefig(os.path.join(args.path, f'{task}.png'))
+    plt.show()   
