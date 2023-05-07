@@ -56,10 +56,10 @@ def create_sample_func(args):
   """ given a list of scores, return index chosen """
   if args.sampler == "max":
     return lambda x: np.argmax(x)
-  elif args.sampler == "soft":
-    return lambda x: np.random.choice(np.arange(len(x)), p=(np.exp(x)/sum(np.exp(x))))
+  elif args.sampler == "sum":
+    return lambda x: np.random.choice(np.arange(len(x)), p=(x/sum(x)) )
   else:
-    raise ValueError("args.sampler is invalid [max, soft]")
+    raise ValueError("args.sampler is invalid [max, sum]")
 
 def relabel_trajectory(transitions):
   relabeled_trajectory = []
@@ -82,8 +82,9 @@ if __name__ == '__main__':
   parser.add_argument('--lr', type=float, default=3e-4)
   parser.add_argument('--sigma', type=float, default=0.05)
   parser.add_argument('--log_dir', type=str, default='/gpfs/data/gdk/abagaria/affordances_logs')
-  parser.add_argument('--sampler', type=str, default='soft')
-  parser.add_argument('--init_learner', type=str, default='binary')
+  parser.add_argument('--sampler', type=str, default='sum')
+  parser.add_argument('--bonus', type=utils.boolify, default=False)
+  parser.add_argument('--vis_init_set', type=utils.boolify, default=True)
   parser.add_argument('--optimal_ik', type=utils.boolify, default=False)
   parser.add_argument('--segment', type=utils.boolify, default=False)
   parser.add_argument('--render', type=utils.boolify, default=False)
