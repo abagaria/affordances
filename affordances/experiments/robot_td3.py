@@ -213,7 +213,8 @@ if __name__ == '__main__':
 
   # save 
   init_learner_fname = os.path.join(g_log_dir, 'init.pth')
-  init_learner.save(init_learner_fname)
+  if args.init_learner != "random":
+    init_learner.save(init_learner_fname)
   agent.agent.save(g_log_dir)
 
 

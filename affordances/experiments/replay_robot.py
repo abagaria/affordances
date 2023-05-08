@@ -32,6 +32,14 @@ if __name__ == '__main__':
   args.sigma = job_data['lr']
   args.sampler = job_data['sampler']
   args.gpu = job_data['gpu']
+  args.seed = job_data['seed']
+
+  if "uncertainty" in job_data.keys():
+    args.uncertainty = job_data['uncertainty']
+  else:
+    args.uncertainty = 'none'
+
+  utils.set_random_seed(args.seed)
 
   # create env, agent, init_learner
   env = make_robosuite_env(
