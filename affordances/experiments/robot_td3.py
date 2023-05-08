@@ -49,7 +49,8 @@ def create_gvf(args, env, agent):
     agent.get_actions, 
     env.action_space.shape[0],
     env.observation_space.shape[0],
-    optimistic_threshold=0.5
+    optimistic_threshold=0.5,
+    uncertainty_type=args.uncertainty
   )
 
 def create_sample_func(args):
@@ -84,13 +85,16 @@ if __name__ == '__main__':
   parser.add_argument('--log_dir', type=str, default='/gpfs/data/gdk/abagaria/affordances_logs')
   parser.add_argument('--sampler', type=str, default='sum')
   parser.add_argument('--init_learner', type=str, default='binary')
-  parser.add_argument('--bonus', type=utils.boolify, default=False)
+  parser.add_argument('--uncertainty', type=str, default='none')
   parser.add_argument('--optimal_ik', type=utils.boolify, default=False)
   parser.add_argument('--segment', type=utils.boolify, default=False)
   parser.add_argument('--render', type=utils.boolify, default=False)
   parser.add_argument('--vis_init_set', type=utils.boolify, default=False)
   args = parser.parse_args()
   print(args)
+
+  if args.uncertainty != 'none':
+    assert args.init_learner == 'gvf'
 
   g_log_dir = os.path.join(args.log_dir, args.experiment_name, args.sub_dir)
 

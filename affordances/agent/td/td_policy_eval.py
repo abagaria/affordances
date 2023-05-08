@@ -128,6 +128,21 @@ class TDPolicyEvaluator:
     )
     return torch.max(qvalues, dim=1).values.cpu().numpy()
 
+  @torch.no_grad()
+  def get_value_change(self, states, target_policy):
+    assert isinstance(states, np.ndarray), type(states)
+    state_tensor = torch.as_tensor(states).float().to(self._device)
+    action_tensor = target_policy(state_tensor)
+    
+    q1, q2 = self._online_q_network(state_tensor, action_tensor)
+    online_qvalues = torch.min(q1.squeeze(), q2.squeeze())
+        
+    q1, q2 = self._target_q_network(state_tensor, action_tensor)
+    target_qvalues = torch.min(q1.squeeze(), q2.squeeze())
+
+    return torch.absolute(online_qvalues - target_qvalues)
+
+
   def train(self, target_policy):
     """Single minibatch update of the evaluation value-function."""
     transitions = batch_experiences(
