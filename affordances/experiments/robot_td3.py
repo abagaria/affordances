@@ -79,6 +79,9 @@ def relabel_trajectory(transitions):
       break
   return relabeled_trajectory
 
+def count_uncertainty(counts):
+    return 1.0 / np.sqrt(counts + 1.0)
+
 if __name__ == '__main__':
   parser = argparse.ArgumentParser()
   parser.add_argument('--experiment_name', type=str)
@@ -90,9 +93,10 @@ if __name__ == '__main__':
   parser.add_argument('--lr', type=float, default=3e-4)
   parser.add_argument('--sigma', type=float, default=0.05)
   parser.add_argument('--log_dir', type=str, default='/gpfs/data/gdk/abagaria/affordances_logs')
-  parser.add_argument('--sampler', type=str, default='sum')
+  parser.add_argument('--sampler', type=str, default='sum', help='[sum, max]')
   parser.add_argument('--init_learner', type=str, default='binary')
-  parser.add_argument('--uncertainty', type=str, default='none')
+  parser.add_argument('--uncertainty', type=str, default='none', help='[none, bonus, count_qpos, count_grasp]')
+  parser.add_argument('--bonus_scale', type=float, default=1.0)
   parser.add_argument('--only_reweigh_negatives', type=utils.boolify, default=False)
   parser.add_argument('--optimal_ik', type=utils.boolify, default=False)
   parser.add_argument('--segment', type=utils.boolify, default=False)
@@ -145,14 +149,15 @@ if __name__ == '__main__':
     init_gvf = None
   
   # load grasps 
-  qpos_per_grasp = 1 if env.optimal_ik else 5
+  n_qpos_per_grasp = 1 if env.optimal_ik else 5
   grasps = env.load_grasps()
-  grasp_state_vectors, grasp_qpos = env.get_states_from_grasps(n=qpos_per_grasp)
-  grasp_counts = {}
-  grasp_success = {}
-  for i in range(len(grasp_qpos)):
-    grasp_counts[i] = 0
-    grasp_success[i] = 0 
+  grasp_state_vectors, grasp_qpos = env.get_states_from_grasps(n=n_qpos_per_grasp)
+
+  # init counts
+  qpos_counts = np.zeros(len(grasp_state_vectors))
+  qpos_success = np.zeros(len(grasp_state_vectors))
+  grasp_counts = np.zeros(len(grasps))
+  grasp_success = np.zeros(len(grasps))
 
   # train
   episodic_rewards = []
@@ -163,14 +168,28 @@ if __name__ == '__main__':
     done = False
     episode_reward = 0.
 
+    # score
     grasp_scores = init_learner.score(grasp_state_vectors)
+
+    # maybe bonus
+    if args.uncertainty == "count_qpos":
+        bonus = count_uncertainty(qpos_counts)
+        grasp_scores += args.bonus_scale * bonus
+    elif args.uncertainty == "count_grasp":
+        bonus = count_uncertainty(grasp_counts)
+        bonus = np.repeat(bonus, n_qpos_per_grasp)
+        grasp_scores += args.bonus_scale * bonus
+
+    # maybe vis 
     if args.init_learner != "random" and args.vis_init_set and episode % 500 == 0:
       mask = grasp_scores > init_learner.optimistic_threshold
       env.reset()
       env.render_states(grasp_qpos[mask], ep_num=episode, fpath=g_log_dir)
 
+    # reset 
     selected_idx = sample_func(grasp_scores)
     selected_qpos = grasp_qpos[selected_idx]
+    selected_grasp_idx = selected_idx // n_qpos_per_grasp
     obs = env.reset_to_joint_state(selected_qpos)
     
     trajectory = []  # (s, a, r, s', info)
@@ -187,8 +206,11 @@ if __name__ == '__main__':
     success = info['success']
     episodic_rewards.append(episode_reward)
     episodic_success.append(success)
-    grasp_counts[selected_idx]+=1
-    grasp_success[selected_idx]+=info['success']
+    grasp_counts[selected_grasp_idx] += 1
+    grasp_success[selected_grasp_idx] += info['success']
+    qpos_counts[selected_idx] += 1
+    qpos_success[selected_idx] += info['success']
+    
     print(f'Episode {episode} Reward {episode_reward} Success {success}')
 
     # maybe update gvf
@@ -214,8 +236,10 @@ if __name__ == '__main__':
             current_step_count=n_steps,
             classifier_loss=init_learner.classifier.losses if type(init_learner) is MlpInitiationClassifier else [],
             scores=grasp_scores,
-            counts=grasp_counts,
-            grasp_success=grasp_success
+            grasp_counts=grasp_counts,
+            grasp_success=grasp_success,
+            qpos_counts=qpos_counts,
+            qpos_success=qpos_success
           )
       )
 
