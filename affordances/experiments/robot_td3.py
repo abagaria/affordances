@@ -38,7 +38,14 @@ def create_init_learner(args, env, agent):
     input_dim = env.observation_space.shape[0]
     optimistic_threshold=0.5,
     pessimistic_threshold=0.75,
-    return MlpInitiationClassifier(device, optimistic_threshold, pessimistic_threshold, input_dim, maxlen=100)
+    return MlpInitiationClassifier(
+      device, 
+      optimistic_threshold, 
+      pessimistic_threshold, 
+      input_dim, 
+      maxlen=100, 
+      only_reweigh_negative_examples=args.only_reweigh_negatives
+    )
   elif args.init_learner == "gvf":
     return create_gvf(args, env, agent)
   else:
@@ -86,6 +93,7 @@ if __name__ == '__main__':
   parser.add_argument('--sampler', type=str, default='sum')
   parser.add_argument('--init_learner', type=str, default='binary')
   parser.add_argument('--uncertainty', type=str, default='none')
+  parser.add_argument('--only_reweigh_negatives', type=utils.boolify, default=False)
   parser.add_argument('--optimal_ik', type=utils.boolify, default=False)
   parser.add_argument('--segment', type=utils.boolify, default=False)
   parser.add_argument('--render', type=utils.boolify, default=False)

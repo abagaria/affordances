@@ -182,7 +182,7 @@ class ConvClassifier(Classifier):
         n_input_channels=1,
         batch_size=32,
         lr=1e-3,
-        only_reweigh_negative_examples=True):
+        only_reweigh_negative_examples=False):
 
     self.model = ImageCNN(n_input_channels).to(device)
     super().__init__(device=device, threshold=threshold, batch_size=batch_size, lr=lr,
@@ -201,7 +201,7 @@ class MlpClassifier(Classifier):
         threshold=0.5,
         batch_size=32,
         lr=1e-3,
-        only_reweigh_negative_examples=True):
+        only_reweigh_negative_examples=False):
 
     self.model = MLP(input_dim).to(device)
     super().__init__(device=device, threshold=threshold, batch_size=batch_size, lr=lr,

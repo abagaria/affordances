@@ -69,8 +69,10 @@ class BinaryInitiationClassifier(InitiationClassifier):
       Y = torch.cat((positive_labels, negative_labels), dim=0)
 
       if self.classifier.should_train(Y):
-        # TODO (ba): assumes low-dim
-        self.classifier = MlpClassifier(self.device, self.input_dim) 
+        # TODO (ba): assumes MLP 
+        self.classifier = MlpClassifier(self.device, self.input_dim,
+          only_reweigh_negative_examples=self.classifier.only_reweigh_negative_examples
+        ) 
         self.classifier.fit(X, Y, initiation_gvf, goal)
 
   def save(self, filename: str):
@@ -84,10 +86,14 @@ class ConvInitiationClassifier(BinaryInitiationClassifier):
     optimistic_threshold: float,
     pessimistic_threshold: float,
     n_input_channels: int = 1,
-    maxlen: int = 10
+    maxlen: int = 10,
+    only_reweigh_negative_examples: bool = False,
   ): 
-    self.classifier = ConvClassifier(device, None, n_input_channels)
+    self.classifier = ConvClassifier(device, None, n_input_channels,
+      only_reweigh_negative_examples=only_reweigh_negative_examples
+    )
     self.n_input_channels = n_input_channels
+    self.only_reweigh_negative_examples = only_reweigh_negative_examples
     super().__init__(device, 
       optimistic_threshold, 
       pessimistic_threshold, 
@@ -95,7 +101,9 @@ class ConvInitiationClassifier(BinaryInitiationClassifier):
     )
 
   def load(self, filename: str):
-    self.classifier = ConvClassifier(self.device, None, self.n_input_channels)
+    self.classifier = ConvClassifier(self.device, None, self.n_input_channels,
+      only_reweigh_negative_examples=self.only_reweigh_negative_examples
+    )
     self.classifier.model.load_state_dict(
       torch.load(filename)
     )
@@ -106,10 +114,14 @@ class MlpInitiationClassifier(BinaryInitiationClassifier):
     optimistic_threshold: float,
     pessimistic_threshold: float,
     input_dim: int = 1,
-    maxlen: int = 10
+    maxlen: int = 10,
+    only_reweigh_negative_examples: bool = False,
   ):
-    self.classifier = MlpClassifier(device, input_dim)
+    self.classifier = MlpClassifier(device, input_dim,
+      only_reweigh_negative_examples=only_reweigh_negative_examples
+    )
     self.input_dim = input_dim
+    self.only_reweigh_negative_examples = only_reweigh_negative_examples
     super().__init__(device, 
       optimistic_threshold,
       pessimistic_threshold,
@@ -117,7 +129,9 @@ class MlpInitiationClassifier(BinaryInitiationClassifier):
     )
 
   def load(self, filename: str):
-    self.classifier = MlpClassifier(self.device, self.input_dim)
+    self.classifier = MlpClassifier(self.device, self.input_dim,
+      only_reweigh_negative_examples=self.only_reweigh_negative_examples
+    )
     self.classifier.model.load_state_dict(
       torch.load(filename)
     )
