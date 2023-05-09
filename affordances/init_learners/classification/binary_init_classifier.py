@@ -69,6 +69,8 @@ class BinaryInitiationClassifier(InitiationClassifier):
       Y = torch.cat((positive_labels, negative_labels), dim=0)
 
       if self.classifier.should_train(Y):
+        # TODO (ba): assumes low-dim
+        self.classifier = MlpClassifier(self.device, self.input_dim) 
         self.classifier.fit(X, Y, initiation_gvf, goal)
 
   def save(self, filename: str):
