@@ -110,6 +110,9 @@ if __name__ == '__main__':
   if args.uncertainty == 'bonus':
     assert args.init_learner == 'gvf'
 
+  if args.only_reweigh_negatives:
+    assert args.init_learner == 'weighted-binary'
+
   g_log_dir = os.path.join(args.log_dir, args.experiment_name, args.sub_dir)
 
   utils.create_log_dir(args.log_dir)
