@@ -44,7 +44,8 @@ def create_init_learner(args, env, agent):
       pessimistic_threshold, 
       input_dim, 
       maxlen=100, 
-      only_reweigh_negative_examples=args.only_reweigh_negatives
+      only_reweigh_negative_examples=args.only_reweigh_negatives,
+      gestation_period=args.gestation
     )
   elif args.init_learner == "gvf":
     return create_gvf(args, env, agent)
@@ -97,6 +98,7 @@ if __name__ == '__main__':
   parser.add_argument('--init_learner', type=str, default='binary')
   parser.add_argument('--uncertainty', type=str, default='none', help='[none, bonus, count_qpos, count_grasp]')
   parser.add_argument('--bonus_scale', type=float, default=1.0)
+  parser.add_argument('--gestation', type=int, default=1)
   parser.add_argument('--only_reweigh_negatives', type=utils.boolify, default=False)
   parser.add_argument('--optimal_ik', type=utils.boolify, default=False)
   parser.add_argument('--segment', type=utils.boolify, default=False)
@@ -105,7 +107,7 @@ if __name__ == '__main__':
   args = parser.parse_args()
   print(args)
 
-  if args.uncertainty != 'none':
+  if args.uncertainty == 'bonus':
     assert args.init_learner == 'gvf'
 
   g_log_dir = os.path.join(args.log_dir, args.experiment_name, args.sub_dir)
