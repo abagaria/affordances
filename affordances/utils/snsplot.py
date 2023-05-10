@@ -64,6 +64,10 @@ def get_data(rootDir, conditions=None, task=None, smoothen=100):
           job_data[key] = job_data[key][:-3]
         log_df[key] = job_data[key]
 
+      if 'uncertainty' not in job_data.keys():
+        job_data['uncertainty'] = 'none'
+        log_df['uncertainty'] = 'none'
+
       # maybe filter on conditions 
       if conditions is not None: 
         for cond_key, cond_dict in conditions.items(): 
@@ -85,53 +89,55 @@ if __name__ == '__main__':
   parser.add_argument('path', type=str)
   args = parser.parse_args()
 
-  # for task in TASKS:
+  for task in TASKS:
 
-  #   data, scores = get_data(args.path, conditions=conditions, task=task)
-  #   for key, val in mask.items():
-  #     data = data[ data[key] == val ]
+    data, scores = get_data(args.path, conditions=conditions, task=task)
+    for key, val in mask.items():
+      data = data[ data[key] == val ]
 
-  #   y_var = "success"
-  #   g = sns.relplot(x='episode',
-  #                   y=y_var, 
-  #                   kind='line',
-  #                   data=data,
-  #                   alpha=0.8,
-  #                   hue="condition",
-  #                   hue_order=conditions.keys(),
-  #                   col="environment_name",
-  #                   # row="segment",
-  #                   # style="optimal_ik",
-  #                   # style='sampler',
-  #                   row="sampler",
-  #                   facet_kws={"sharex":False,"sharey":True},
-  #                   errorbar="se"
-  #   )
-  #   g.set_titles(col_template = '{col_name}')
-  #   g.set_axis_labels( "Episode" , y_var)
-  #   # plt.savefig(f'{args.path}/{y_var}.svg')
-  #   # plt.savefig(f'{args.path}/{y_var}.png')
-  #   plt.show()
+    y_var = "success"
+    g = sns.relplot(x='episode',
+                    y=y_var, 
+                    kind='line',
+                    data=data,
+                    alpha=0.8,
+                    hue="condition",
+                    hue_order=conditions.keys(),
+                    # col="environment_name",
+                    # row="segment",
+                    # style="optimal_ik",
+                    # style='sampler',
+                    col="sampler",
+                    row="uncertainty",
+                    facet_kws={"sharex":False,"sharey":True},
+                    errorbar="se"
+    )
+    plt.suptitle(task)
+    # g.set_titles(col_template = '{col_name}')
+    g.set_axis_labels( "Episode" , y_var)
+    # plt.savefig(f'{args.path}/{y_var}.svg')
+    plt.savefig(f'{args.path}/{y_var}.png', bbox_inches='tight')
+    plt.show()
 
 
   # Akhil's logic: 
-  ideal_len = 4991
-  for i, task in enumerate(TASKS):
+  # ideal_len = 4991
+  # for i, task in enumerate(TASKS):
 
-    data, scores =get_data(args.path, conditions=conditions, task=task)
-    for pattern, score_lists in scores.items():
+  #   data, scores =get_data(args.path, conditions=conditions, task=task)
+  #   for pattern, score_lists in scores.items():
 
-      try:
-        min_length = min([len(arr) for arr in score_lists])
-        score_lists = truncate(score_lists, max_length=min_length)
-        # score_lists = [s for s in score_lists if len(s) == ideal_len]
-        score_array = np.asarray(score_lists)
-        label = pattern[2:] if pattern[:2] == '__' else pattern
-        generate_plot(score_array, label, smoothen=100, all_seeds=False)
-      except Exception as e:
-        print(e)
+  #     try:
+  #       min_length = min([len(arr) for arr in score_lists])
+  #       score_lists = truncate(score_lists, max_length=min_length)
+  #       # score_lists = [s for s in score_lists if len(s) == ideal_len]
+  #       score_array = np.asarray(score_lists)
+  #       label = pattern[2:] if pattern[:2] == '__' else pattern
+  #       generate_plot(score_array, label, smoothen=100, all_seeds=False)
+  #     except Exception as e:
+  #       print(e)
 
-    plt.title(task)
-    plt.legend()
-    plt.savefig(os.path.join(args.path, f'{task}.png'))
-    plt.show()   
+  #   plt.title(task)
+  #   plt.legend()
+  #   plt.savefig(os.path.join(args.path, f'{task}.png'))
+  #   plt.show()   

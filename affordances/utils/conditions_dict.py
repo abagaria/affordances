@@ -1,29 +1,29 @@
 IK=False
 conditions = { 
-                # 'Random': 
-                #     {
-                #         'init_learner': 'random',
-                #         'optimal_ik':IK,
-                #         'segment':False
-                #     },
-                # 'Binary':
-                #     {
-                #         'init_learner': 'binary',
-                #         'optimal_ik':IK,
-                #         'segment':False
-                #     }, 
-                # 'GVF':
-                #     {
-                #         'init_learner': 'gvf',
-                #         'optimal_ik':IK,
-                #         'segment':False
-                #     },
-                # 'Weighted':
-                #     {
-                #         'init_learner': 'weighted-binary',
-                #         'optimal_ik':IK,
-                #         'segment':False
-                #     },   
+                'Random': 
+                    {
+                        'init_learner': 'random',
+                        'optimal_ik':IK,
+                        'segment':False
+                    },
+                'Binary':
+                    {
+                        'init_learner': 'binary',
+                        'optimal_ik':IK,
+                        'segment':False
+                    }, 
+                'GVF':
+                    {
+                        'init_learner': 'gvf',
+                        'optimal_ik':IK,
+                        'segment':False
+                    },
+                'Weighted':
+                    {
+                        'init_learner': 'weighted-binary',
+                        'optimal_ik':IK,
+                        'segment':False
+                    },   
                  # 'Random-soft': 
                  #    {
                  #        'init_learner': 'random',
@@ -59,13 +59,13 @@ conditions = {
                 #         'segment':False,
                 #         'sampler':'sum'
                 #     },
-                'Random': 
-                    {
-                        'init_learner': 'random',
-                        'optimal_ik':IK,
-                        'segment':False,
-                        'sampler':'max'
-                    },
+                # 'Random': 
+                #     {
+                #         'init_learner': 'random',
+                #         'optimal_ik':IK,
+                #         'segment':False,
+                #         # 'sampler':'max'
+                #     },
                 # 'Binary-Sum':
                 #     {
                 #         'init_learner': 'binary',
@@ -78,7 +78,8 @@ conditions = {
                 #         'init_learner': 'gvf',
                 #         'optimal_ik':IK,
                 #         'segment':False,
-                #         'sampler':'sum'
+                #         'sampler':'sum',
+                #         'uncertainty':'none'
                 #     },
                 # 'Weighted-Sum':
                 #     {
@@ -88,27 +89,46 @@ conditions = {
                 #         'sampler':'sum'
                 #     }, 
 
-                'Binary-Max':
-                    {
-                        'init_learner': 'binary',
-                        'optimal_ik':IK,
-                        'segment':False,
-                        'sampler':'max'
-                    }, 
-                'GVF-Max':
-                    {
-                        'init_learner': 'gvf',
-                        'optimal_ik':IK,
-                        'segment':False,
-                        'sampler':'max'
-                    },
-                'Weighted-Max':
-                    {
-                        'init_learner': 'weighted-binary',
-                        'optimal_ik':IK,
-                        'segment':False,
-                        'sampler':'max'
-                    }, 
+                # 'Binary-Max':
+                #     {
+                #         'init_learner': 'binary',
+                #         'optimal_ik':IK,
+                #         'segment':False,
+                #         'sampler':'max'
+                #     }, 
+                # 'GVF-Max':
+                #     {
+                #         'init_learner': 'gvf',
+                #         'optimal_ik':IK,
+                #         'segment':False,
+                #         'sampler':'max',
+                #         'uncertainty':'none,'
+
+                #     },
+                # 'Weighted-Max':
+                #     {
+                #         'init_learner': 'weighted-binary',
+                #         'optimal_ik':IK,
+                #         'segment':False,
+                #         'sampler':'max'
+                #     }, 
+                # 'GVF-Sum-Bonus':
+                #     {
+                #         'init_learner': 'gvf',
+                #         'optimal_ik':IK,
+                #         'segment':False,
+                #         'sampler':'sum',
+                #         'uncertainty':'bonus'
+                #     },
+                # 'GVF-Max-Bonus':
+                #     {
+                #         'init_learner': 'gvf',
+                #         'optimal_ik':IK,
+                #         'segment':False,
+                #         'sampler':'max',
+                #         'uncertainty':'bonus'
+                #     },
+
                   
                 #  'Random-Segmented': 
                 #     {
