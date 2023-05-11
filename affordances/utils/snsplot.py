@@ -12,7 +12,8 @@ from affordances.utils.plotting_script import generate_plot, truncate, moving_av
 from affordances.utils.conditions_dict import conditions
 
 sns.set_palette('colorblind')
-sns.set(font_scale=1.5)
+# sns.set(font_scale=1.0)
+# sns.set(rc={'figure.figsize':(11.7,8.27)})
 
 # IK = False
 EVAL_FREQ = 10 
@@ -21,9 +22,10 @@ TASKS = ["DoorCIP", "LeverCIP", "SlideCIP"]
 # mask = {"optimal_ik":False,
 #         "environment_name": "Door",
 #         "init_learner":"binary"}
-mask = {}
+# mask={"sampler":"max", "init_learner":"gvf"}
+mask={}
 
-def get_data(rootDir, conditions=None, task=None, smoothen=100):
+def get_data(rootDirs, conditions=None, task=None, smoothen=100):
   scores = {}
   runs = []
   count=0
@@ -31,67 +33,81 @@ def get_data(rootDir, conditions=None, task=None, smoothen=100):
     for condition in conditions.keys():
       scores[condition] = []
 
-  for dirName, subdirList, fileList in os.walk(rootDir):
-    for fname in fileList:
-      if "log_seed" not in fname:
-        continue 
-      
-      # process the job config
-      config_path = os.path.join(dirName, 'config.pkl')
-      with gzip.open(config_path, 'rb+') as f:
-        job_data = pickle.load(f)
+  for rootDir in rootDirs:
+    for dirName, subdirList, fileList in os.walk(rootDir):
+      for fname in fileList:
+        if "log_seed" not in fname:
+          continue 
+        
+        # process the job config
+        config_path = os.path.join(dirName, 'config.pkl')
+        with gzip.open(config_path, 'rb+') as f:
+          job_data = pickle.load(f)
 
-      if task is not None:
-        if job_data['environment_name'] != task:
-          continue
+        if task is not None:
+          if job_data['environment_name'] != task:
+            continue
 
-      # print('Found run: %s' % dirName)
+        # print('Found run: %s' % dirName)
 
-      # if we find a log, read into dataframe
-      path = os.path.join(dirName,fname)
-      eval_files = pickle.load(gzip.open(path, "rb+"))
-      eval_successes = eval_files['success']
-      eval_rewards = eval_files['rewards']
-      # print(len(eval_successes))
+        # if we find a log, read into dataframe
+        path = os.path.join(dirName,fname)
+        eval_files = pickle.load(gzip.open(path, "rb+"))
+        eval_successes = eval_files['success']
+        eval_rewards = eval_files['rewards']
+        # print(len(eval_successes))
 
-      log_df = pd.DataFrame()
-      log_df['success'] = moving_average(eval_successes, n=smoothen)
-      log_df['reward'] = moving_average(eval_rewards, n=smoothen)
-      log_df['episode'] = np.arange(len(log_df)) + EVAL_FREQ
-      log_df['tag']=str(count)
-      for key, val in job_data.items():
-        if key == "environment_name":
-          job_data[key] = job_data[key][:-3]
-        log_df[key] = job_data[key]
+        # parse reward
+        log_df = pd.DataFrame()
+        log_df['success'] = moving_average(eval_successes, n=smoothen)
+        log_df['reward'] = moving_average(eval_rewards, n=smoothen)
+        log_df['episode'] = np.arange(len(log_df)) + EVAL_FREQ
+        log_df['tag']=str(count)
 
-      if 'uncertainty' not in job_data.keys():
-        job_data['uncertainty'] = 'none'
-        log_df['uncertainty'] = 'none'
+        # defaults
+        if 'uncertainty' not in job_data.keys():
+          job_data['uncertainty'] = 'none'
 
-      # maybe filter on conditions 
-      if conditions is not None: 
-        for cond_key, cond_dict in conditions.items(): 
-          if np.all( [job_data[k] == v for k, v in cond_dict.items()] ):
-            scores[cond_key].append(eval_successes)
-            log_df['condition'] = cond_key
-            runs.append(log_df)
-            break
-      else:
-        runs.append(log_df)
+        if 'only_reweigh_negatives' not in job_data.keys():
+          job_data['only_reweigh_negatives'] = False
 
-      count+=1
+        if 'bonus_scale' not in job_data.keys():
+          job_data['bonus_scale'] = 1
+
+        if job_data['init_learner'] == 'random':
+          job_data['sampler'] = 'sum'
+
+        # fill in log_df
+        for key, val in job_data.items():
+          if key == "environment_name":
+            job_data[key] = job_data[key][:-3]
+          log_df[key] = job_data[key]
+
+        # maybe filter on conditions 
+        if conditions is not None: 
+          for cond_key, cond_dict in conditions.items(): 
+            if np.all( [job_data[k] == v for k, v in cond_dict.items()] ):
+              scores[cond_key].append(eval_successes)
+              log_df['condition'] = cond_key
+              runs.append(log_df)
+              break
+        else:
+          runs.append(log_df)
+
+        count+=1
 
   data = pd.concat(runs)
+  data = data.astype({"bonus_scale" : str})
   return data, scores
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser()
-  parser.add_argument('path', type=str)
+  parser.add_argument('path', nargs='+', default=[])
   args = parser.parse_args()
 
   for task in TASKS:
 
-    data, scores = get_data(args.path, conditions=conditions, task=task)
+    data, scores = get_data(args.path, conditions=conditions, task=task)  
     for key, val in mask.items():
       data = data[ data[key] == val ]
 
@@ -101,14 +117,17 @@ if __name__ == '__main__':
                     kind='line',
                     data=data,
                     alpha=0.8,
-                    hue="condition",
-                    hue_order=conditions.keys(),
+                    # hue="condition",
+                    # hue_order=conditions.keys(),
                     # col="environment_name",
                     # row="segment",
                     # style="optimal_ik",
                     # style='sampler',
-                    col="sampler",
-                    row="uncertainty",
+                    # col="only_reweigh_negatives",
+                    hue='bonus_scale',
+                    col="uncertainty",
+                    row='sampler',
+                    style='init_learner',
                     facet_kws={"sharex":False,"sharey":True},
                     errorbar="se"
     )
@@ -116,9 +135,8 @@ if __name__ == '__main__':
     # g.set_titles(col_template = '{col_name}')
     g.set_axis_labels( "Episode" , y_var)
     # plt.savefig(f'{args.path}/{y_var}.svg')
-    plt.savefig(f'{args.path}/{y_var}.png', bbox_inches='tight')
+    plt.savefig(f'{args.path[0]}/{task}_{y_var}.png', bbox_inches='tight')
     plt.show()
-
 
   # Akhil's logic: 
   # ideal_len = 4991
