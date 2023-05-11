@@ -13,11 +13,14 @@ class BinaryInitiationClassifier(InitiationClassifier):
     device, 
     optimistic_threshold: float,
     pessimistic_threshold: float,
-    maxlen: int = 10
+    maxlen: int = 10,
+    gestation_period: int = 1,
   ):
     self.device = device
     self.optimistic_threshold = optimistic_threshold
     self.pessimistic_threshold = pessimistic_threshold
+    self.gestation_period = gestation_period
+    self.num_successes = 0
   
     super().__init__(max_n_trajectories=maxlen)
 
@@ -37,6 +40,11 @@ class BinaryInitiationClassifier(InitiationClassifier):
     return self._predict(states, self.pessimistic_threshold)
 
   def score(self, states: np.ndarray) -> np.ndarray:
+
+    # maybe gestating
+    if self.num_successes < self.gestation_period:
+      return np.ones(len(states))
+
     state_tensor = utils.tensorfy(states, self.device)
     preprocessed_tensor = self.classifier.preprocess_batch(state_tensor)
     scores = self.classifier.predict_probs(preprocessed_tensor)
@@ -51,11 +59,12 @@ class BinaryInitiationClassifier(InitiationClassifier):
 
     if success_label:
       self.positive_examples.append(examples)
+      self.num_successes += 1
     else:
       self.negative_examples.append(examples)
 
   def update(self, initiation_gvf=None, goal=None):
-    if self.positive_examples and self.negative_examples:
+    if self.num_successes >= self.gestation_period:
       pos_examples = list(itertools.chain.from_iterable(self.positive_examples))
       neg_examples = list(itertools.chain.from_iterable(self.negative_examples))
       
@@ -81,32 +90,32 @@ class BinaryInitiationClassifier(InitiationClassifier):
   def load(self, filename: str):
     raise NotImplementedError
 
-class ConvInitiationClassifier(BinaryInitiationClassifier):
-  def __init__(device, 
-    optimistic_threshold: float,
-    pessimistic_threshold: float,
-    n_input_channels: int = 1,
-    maxlen: int = 10,
-    only_reweigh_negative_examples: bool = False,
-  ): 
-    self.classifier = ConvClassifier(device, None, n_input_channels,
-      only_reweigh_negative_examples=only_reweigh_negative_examples
-    )
-    self.n_input_channels = n_input_channels
-    self.only_reweigh_negative_examples = only_reweigh_negative_examples
-    super().__init__(device, 
-      optimistic_threshold, 
-      pessimistic_threshold, 
-      maxlen=maxlen
-    )
+# class ConvInitiationClassifier(BinaryInitiationClassifier):
+#   def __init__(device, 
+#     optimistic_threshold: float,
+#     pessimistic_threshold: float,
+#     n_input_channels: int = 1,
+#     maxlen: int = 10,
+#     only_reweigh_negative_examples: bool = False,
+#   ): 
+#     self.classifier = ConvClassifier(device, None, n_input_channels,
+#       only_reweigh_negative_examples=only_reweigh_negative_examples
+#     )
+#     self.n_input_channels = n_input_channels
+#     self.only_reweigh_negative_examples = only_reweigh_negative_examples
+#     super().__init__(device, 
+#       optimistic_threshold, 
+#       pessimistic_threshold, 
+#       maxlen=maxlen
+#     )
 
-  def load(self, filename: str):
-    self.classifier = ConvClassifier(self.device, None, self.n_input_channels,
-      only_reweigh_negative_examples=self.only_reweigh_negative_examples
-    )
-    self.classifier.model.load_state_dict(
-      torch.load(filename)
-    )
+#   def load(self, filename: str):
+#     self.classifier = ConvClassifier(self.device, None, self.n_input_channels,
+#       only_reweigh_negative_examples=self.only_reweigh_negative_examples
+#     )
+#     self.classifier.model.load_state_dict(
+#       torch.load(filename)
+#     )
 
 class MlpInitiationClassifier(BinaryInitiationClassifier):
   def __init__(self,
@@ -116,21 +125,24 @@ class MlpInitiationClassifier(BinaryInitiationClassifier):
     input_dim: int = 1,
     maxlen: int = 10,
     only_reweigh_negative_examples: bool = False,
+    gestation_period: int = 1,
   ):
     self.classifier = MlpClassifier(device, input_dim,
       only_reweigh_negative_examples=only_reweigh_negative_examples
     )
     self.input_dim = input_dim
     self.only_reweigh_negative_examples = only_reweigh_negative_examples
+    self.gestation_period = gestation_period
     super().__init__(device, 
       optimistic_threshold,
       pessimistic_threshold,
-      maxlen=maxlen
+      maxlen=maxlen,
+      gestation_period=gestation_period
     )
 
   def load(self, filename: str):
     self.classifier = MlpClassifier(self.device, self.input_dim,
-      only_reweigh_negative_examples=self.only_reweigh_negative_examples
+      only_reweigh_negative_examples = self.only_reweigh_negative_examples
     )
     self.classifier.model.load_state_dict(
       torch.load(filename)
