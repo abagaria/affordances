@@ -58,7 +58,8 @@ def create_gvf(args, env, agent):
     env.action_space.shape[0],
     env.observation_space.shape[0],
     optimistic_threshold=0.5,
-    uncertainty_type=args.uncertainty
+    uncertainty_type=args.uncertainty,
+    bonus_scale=args.bonus_scale
   )
 
 def create_sample_func(args):

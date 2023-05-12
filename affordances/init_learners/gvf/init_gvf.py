@@ -24,11 +24,14 @@ class InitiationGVF(InitiationLearner):
       pessimistic_threshold: float = 0.8,
       use_prioritized_buffer: bool = True,
       init_replay_capacity: int = 100_000,
-      uncertainty_type: str = 'none'):
+      uncertainty_type: str = 'none',
+      bonus_scale=1.0
+    ):
     super().__init__()
     self._n_actions = n_actions
     self._n_input_channels = n_input_channels
     self._uncertainty_type = uncertainty_type
+    self._bonus_scale = bonus_scale
 
     # Function that maps batch of states to batch of actions (`batch_act()`)
     self.target_policy = target_policy
@@ -104,9 +107,16 @@ class InitiationGVF(InitiationLearner):
 
   def score(self, states):
     scores = self.policy_evaluation_module.get_values(states, self.target_policy)
-    if self._uncertainty_type == "bonus":
+
+    # maybe compute bonus 
+    if self._uncertainty_type == "competence":
       expl_bonus = self.policy_evaluation_module.get_value_change(states, self.target_policy)
-      scores += expl_bonus
+    elif self._uncertainty_type == "diff":
+      expl_bonus = self.policy_evaluation_module.get_value_diff(states, self.target_policy)
+    else:
+      expl_bonus = 0. 
+    
+    scores += self._bonus_scale * expl_bonus
     return scores.reshape(-1).cpu().numpy()
 
 class GoalConditionedInitiationGVF(InitiationGVF):

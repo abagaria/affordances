@@ -142,6 +142,15 @@ class TDPolicyEvaluator:
 
     return torch.absolute(online_qvalues - target_qvalues)
 
+  @torch.no_grad()
+  def get_value_diff(self, states, target_policy):
+    assert isinstance(states, np.ndarray), type(states)
+    state_tensor = torch.as_tensor(states).float().to(self._device)
+    action_tensor = target_policy(state_tensor)
+    
+    q1, q2 = self._online_q_network(state_tensor, action_tensor)
+    return torch.absolute(q2.squeeze() - q1.squeeze())
+
 
   def train(self, target_policy):
     """Single minibatch update of the evaluation value-function."""
