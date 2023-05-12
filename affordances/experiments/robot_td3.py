@@ -112,16 +112,16 @@ if __name__ == '__main__':
     assert args.init_learner == 'gvf' or args.init_learner == 'weighted-binary'
 
   if args.uncertainty == 'none':
-    assert args.bonus_scale = 0
+    assert args.bonus_scale == 0
   else:
     assert args.bonus_scale > 0
 
   if args.init_learner == 'random':
     assert args.bonus_scale == 0
     assert args.uncertainty == 'none'
-    assert args.gestation = 1 
-    assert only_reweigh_negatives = False
-    assert args.sampler = 'sum'
+    assert args.gestation == 1 
+    assert args.only_reweigh_negatives == False
+    assert args.sampler == 'sum'
 
   if args.only_reweigh_negatives:
     assert args.init_learner == 'weighted-binary'
