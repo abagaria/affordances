@@ -97,7 +97,7 @@ if __name__ == '__main__':
   parser.add_argument('--sampler', type=str, default='sum', help='[sum, max]')
   parser.add_argument('--init_learner', type=str, default='binary')
   parser.add_argument('--uncertainty', type=str, default='none', help='[none, bonus, count_qpos, count_grasp]')
-  parser.add_argument('--bonus_scale', type=float, default=1.0)
+  parser.add_argument('--bonus_scale', type=float, default=0.0)
   parser.add_argument('--gestation', type=int, default=1)
   parser.add_argument('--only_reweigh_negatives', type=utils.boolify, default=False)
   parser.add_argument('--optimal_ik', type=utils.boolify, default=False)
@@ -107,8 +107,21 @@ if __name__ == '__main__':
   args = parser.parse_args()
   print(args)
 
+  # maybe exit for nonsense arg combos from onager 
   if args.uncertainty == 'bonus':
-    assert args.init_learner == 'gvf'
+    assert args.init_learner == 'gvf' or args.init_learner == 'weighted-binary'
+
+  if args.uncertainty == 'none':
+    assert args.bonus_scale = 0
+  else:
+    assert args.bonus_scale > 0
+
+  if args.init_learner == 'random':
+    assert args.bonus_scale == 0
+    assert args.uncertainty == 'none'
+    assert args.gestation = 1 
+    assert only_reweigh_negatives = False
+    assert args.sampler = 'sum'
 
   if args.only_reweigh_negatives:
     assert args.init_learner == 'weighted-binary'
