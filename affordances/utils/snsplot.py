@@ -74,6 +74,9 @@ def get_data(rootDirs, conditions=None, task=None, smoothen=100):
         if 'bonus_scale' not in job_data.keys():
           job_data['bonus_scale'] = 1
 
+        if 'gestation' not in job_data.keys():
+          job_data['gestation'] = 1
+
         if job_data['init_learner'] == 'random':
           job_data['sampler'] = 'sum'
 
@@ -117,17 +120,16 @@ if __name__ == '__main__':
                     kind='line',
                     data=data,
                     alpha=0.8,
-                    # hue="condition",
-                    # hue_order=conditions.keys(),
+                    hue="condition",
+                    hue_order=conditions.keys(),
                     # col="environment_name",
                     # row="segment",
                     # style="optimal_ik",
                     # style='sampler',
-                    # col="only_reweigh_negatives",
-                    hue='bonus_scale',
-                    col="uncertainty",
-                    row='sampler',
-                    style='init_learner',
+                    col="only_reweigh_negatives",
+                    # hue='bonus_scale',
+                    row='gestation',
+                    # style='init_learner',
                     facet_kws={"sharex":False,"sharey":True},
                     errorbar="se"
     )
