@@ -1,6 +1,7 @@
 """Measure the accuracy of the initiation sets of a set of options."""
 
 import os
+import ipdb
 import pickle
 import argparse
 import functools
@@ -14,9 +15,9 @@ from affordances.utils.utils import safe_zip_write
 
 from affordances.domains.minigrid import environment_builder, get_open_grid_positions
 from affordances.domains.minigrid import four_rooms_get_room_centers, minigrid_open_grid_subgoals
-from affordances.domains.minigrid import minigrid_doorkey_subgoals
+from affordances.domains.minigrid import minigrid_doorkey_subgoals, pickup_key
 
-from affordances.experiments.gridworld_init_accuracy.options import AgentOverOptions
+from affordances.experiments.doorkey_init_accuracy.options import AgentOverOptions
 from affordances.utils.init_accuracy_plotting import visualize_initiation_table
 from affordances.utils.plotting import visualize_initiation_classifier
 from affordances.utils.plotting import visualize_gc_initiation_learner_split_by_key
@@ -25,23 +26,17 @@ from affordances.utils.plotting import visualize_gc_initiation_learner_split_by_
 def get_valid_states(env):
   states = []
   for pos in get_open_grid_positions(env):
-    states.append(
-      dict(
-        player_pos=pos
-      )
-    )
+    state_with_key = dict(player_pos=pos, has_key=True)
+    state_without_key = dict(player_pos=pos, has_key=False)
+    if args.include_states_with_key:
+      states.append(state_with_key)
+    states.append(state_without_key)
   return states
 
 
 def get_subgoals(env):
   states = []
-  if args.level_name == 'four-rooms':
-    subgoals = four_rooms_get_room_centers()
-  elif args.level_name == 'door-key':
-    subgoals = minigrid_doorkey_subgoals(env)
-  else:
-    assert args.level_name == 'open-grid', args.level_name
-    subgoals = minigrid_open_grid_subgoals()
+  subgoals = minigrid_doorkey_subgoals(env)
   for pos in subgoals:
     states.append(
       dict(
@@ -53,21 +48,29 @@ def get_subgoals(env):
 
 def reset(env, state) -> Tuple[np.ndarray, dict]:
   """Reset simulator to the specified state."""
+  env.reset()
+  if state['has_key'] and not env.carrying:
+    pickup_key(env)
   return env.reset_to(
     state['player_pos'],
-    randomize_direction=args.randomize_direction
+    randomize_direction=args.randomize_direction,
+    additional_reset=False
   )
 
 
 def rollout_option(env, option, obs, info, method='learned') -> bool:
   """Execute option policy and report whether the option was successful."""
   assert isinstance(option, Option)
+  def _pp(info):
+    if 'has_key' in info:
+      return f"pos={info['player_pos']} key={info['has_key']}"
+    return f"pos={info['player_pos']}"
   
   next_obs, next_info, reward, reached, n_steps, traj = option.rollout(
     env, obs, info)
   
-  print(f'{option} I={measured_init} g:{option.subgoal_info["player_pos"]}',
-        f's:{info["player_pos"]} sp: {next_info["player_pos"]} T={n_steps}',
+  print(f'{option} I={measured_init} g:{_pp(option.subgoal_info)}',
+        f's:{_pp(info)} sp: {_pp(next_info)} T={n_steps}',
         f'R={reward} success={reached}')
   
   return next_obs, next_info, reached, traj
@@ -102,10 +105,8 @@ if __name__ == '__main__':
   parser.add_argument('--n_classifier_training_trajectories', type=int, default=10)
   parser.add_argument('--n_classifier_training_epochs', type=int, default=1)
   parser.add_argument('--randomize_direction', action='store_true', default=False)
-  parser.add_argument('--level_name', type=str, default='open-grid')
+  parser.add_argument('--include_states_with_key', action='store_true', default=False)
   args = parser.parse_args()
-
-  assert args.level_name in ('open-grid', 'four-rooms', 'door-key')
 
   g_log_dir = os.path.join(args.log_dir, args.experiment_name, args.sub_dir)
   g_plot_dir = os.path.join(args.plot_dir, args.experiment_name, args.sub_dir)
@@ -122,17 +123,8 @@ if __name__ == '__main__':
 
   utils.set_random_seed(args.seed)
 
-  if args.level_name == 'four-rooms':
-    env_name = 'MiniGrid-FourRooms-v0'
-  elif args.level_name == 'open-grid':
-    env_name = 'MiniGrid-Empty-8x8-v0'
-  elif args.level_name == 'door-key':
-    env_name = 'MiniGrid-DoorKey-16x16-v0'
-  else:
-    env_name = args.level_name
-
   # Create a monte env
-  environment = environment_builder(env_name, max_steps=1000)
+  environment = environment_builder('MiniGrid-DoorKey-16x16-v0', max_steps=1000)
   obs0, info0 = environment.reset()
 
   # s -> o -> measured
@@ -179,12 +171,13 @@ if __name__ == '__main__':
           continue
 
         # Measured option availability
+        state_hash = state["player_pos"][0], state["player_pos"][1], state["has_key"]
         measured_init = option.optimistic_is_init_true(obs, info)
-        measured_initiations[state["player_pos"]][str(option)].append(measured_init)
+        measured_initiations[state_hash][str(option)].append(measured_init)
 
         # Ground-truth monte-carlo rollout
         next_obs, next_info, reached, traj = rollout_option(environment, option, obs, info)
-        ground_truth_initiations[state["player_pos"]][str(option)].append(reached)
+        ground_truth_initiations[state_hash][str(option)].append(reached)
 
         # On-policy things: add data to policy, classifier and GVF buffers;
         # perform updates to the option policy. Reserved for available options.

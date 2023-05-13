@@ -7,13 +7,14 @@ from pfrl.replay_buffers.prioritized import PrioritizedReplayBuffer
 from affordances.init_learners.gvf.init_gvf import InitiationGVF
 
 
-def parse_replay(replay):
+def parse_replay(replay, filter_cond=lambda x: True):
   state_dict = {}
   memory = replay.memory.data if isinstance(replay, PrioritizedReplayBuffer) else replay.memory
   for transition in memory:
     transition = transition[-1]  # n-step to single transition
     pos = transition['extra_info']['player_x'], transition['extra_info']['player_y']
-    state_dict[pos] = transition['next_state']
+    if filter_cond(transition['extra_info']):
+      state_dict[pos] = transition['next_state']
   return state_dict
 
 
@@ -119,9 +120,14 @@ def visualize_gc_initiation_learner(
   value_dict = {}
   for pos in state_dict:
     nsg = state_dict[pos]
-    obs = np.asarray(nsg._frames[:-1]).squeeze(1)[None, ...]
-    assert obs.shape == (1, 4, 84, 84), obs.shape
-    value = initiation_learner.get_values(obs, goal._frames[-1])
+    if hasattr(nsg, '_frames'):
+      obs = np.asarray(nsg._frames[:-1]).squeeze(1)[None, ...]
+      assert obs.shape == (1, 4, 84, 84), obs.shape
+      goal = goal._frames[-1] if hasattr(goal, '_frames') else goal
+    else:
+      obs = nsg[0][np.newaxis, np.newaxis, ...]
+      assert obs.shape == (1, 1, 84, 84), obs.shape
+    value = initiation_learner.get_values(obs, goal)
     value_dict[pos] = value.item()
   
   x = [pos[0] for pos in value_dict]
@@ -131,6 +137,67 @@ def visualize_gc_initiation_learner(
   plt.colorbar()
   gpos = goal_info["player_pos"]
   plt.title(f'Goal pos: {gpos}')
+  if save_fig:
+    plt.savefig(f'{plot_base_dir}/init_vf_{gpos}_{seed}_{episode}.png')
+    plt.close()
+  return value_dict
+
+
+def visualize_gc_initiation_learner_split_by_key(
+    initiation_learner, replay, goal, goal_info,
+    episode, plot_base_dir, seed,
+    save_fig=True
+  ):
+  
+  state_dict = parse_replay(replay, filter_cond=lambda info: info['has_key'])
+  state_dict2 = parse_replay(replay, filter_cond=lambda info: not info['has_key'])
+  
+  value_dict = {}
+  for pos in state_dict:
+    nsg = state_dict[pos]
+    if hasattr(nsg, '_frames'):
+      obs = np.asarray(nsg._frames[:-1]).squeeze(1)[None, ...]
+      assert obs.shape == (1, 4, 84, 84), obs.shape
+      goal = goal._frames[-1]
+    else:
+      obs = nsg[0][np.newaxis, np.newaxis, ...]
+      assert obs.shape == (1, 1, 84, 84), obs.shape
+    value = initiation_learner.get_values(obs, goal)
+    value_dict[pos] = value.item()
+
+  value_dict2 = {}
+  for pos in state_dict2:
+    nsg = state_dict2[pos]
+    if hasattr(nsg, '_frames'):
+      obs = np.asarray(nsg._frames[:-1]).squeeze(1)[None, ...]
+      assert obs.shape == (1, 4, 84, 84), obs.shape
+      goal = goal._frames[-1]
+    else:
+      obs = nsg[0][np.newaxis, np.newaxis, ...]
+      assert obs.shape == (1, 1, 84, 84), obs.shape
+    value = initiation_learner.get_values(obs, goal)
+    value_dict2[pos] = value.item()
+  
+  x = [pos[0] for pos in value_dict]
+  y = [pos[1] for pos in value_dict]
+  v = [value_dict[pos] for pos in value_dict]
+
+  plt.figure(figsize=(20, 12))
+  plt.subplot(1, 2, 1)
+  plt.scatter(x, y, c=v)
+  plt.colorbar()
+  gpos = goal_info["player_pos"]
+  plt.title(f'Goal pos: {gpos} Key=True')
+
+  x = [pos[0] for pos in value_dict2]
+  y = [pos[1] for pos in value_dict2]
+  v = [value_dict2[pos] for pos in value_dict2]
+  plt.subplot(1, 2, 2)
+  plt.scatter(x, y, c=v)
+  plt.colorbar()
+  gpos = goal_info["player_pos"]
+  plt.title(f'Goal pos: {gpos} Key=False')
+
   if save_fig:
     plt.savefig(f'{plot_base_dir}/init_vf_{gpos}_{seed}_{episode}.png')
     plt.close()
@@ -205,8 +272,12 @@ def visualize_initiation_classifier(
   def eg2val(eg, value_dict):
     if eg[1]['player_pos'] in value_dict:
       return value_dict[eg[1]['player_pos']]
-    obs = np.asarray(eg[0]._frames).squeeze(1)[None, ...]
-    return init_gvf.get_values(obs, goal._frames[-1]).item()
+    if hasattr(eg[0], '_frames'):
+      obs = np.asarray(eg[0]._frames).squeeze(1)[None, ...]
+      return init_gvf.get_values(obs, goal._frames[-1]).item()
+    assert isinstance(eg[0], np.ndarray), type(eg[0])
+    assert isinstance(goal, np.ndarray), type(goal)
+    return init_gvf.get_values(eg[0][np.newaxis, ...], goal).item()
 
   weights_positives = [eg2val(eg, value_dict) for eg in positives]
   weights_negatives = [(1 - eg2val(eg, value_dict)) for eg in negatives]

@@ -46,8 +46,9 @@ class MinigridInfoWrapper(Wrapper):
     info['door_open'] = determine_is_door_open(self)
     return info
   
-  def reset_to(self, rand_pos, randomize_direction=False):
-    self.reset()
+  def reset_to(self, rand_pos, additional_reset=True, randomize_direction=False):
+    if additional_reset:
+      self.reset()
 
     new_pos = self.env.place_agent(
       top=rand_pos,
@@ -58,9 +59,10 @@ class MinigridInfoWrapper(Wrapper):
     # Apply the no-op to get the observation image
     obs, _, _, _, info = self.env.step(self.no_op_action)
 
-    info['player_x'] = new_pos[0]
-    info['player_y'] = new_pos[1]
-    info['player_pos'] = new_pos
+    # info['player_x'] = new_pos[0]
+    # info['player_y'] = new_pos[1]
+    # info['player_pos'] = new_pos
+    info = self._modify_info_dict(info)
     
     return obs, info
 
@@ -174,6 +176,19 @@ def determine_goal_pos(env):
           return i, j
       
 
+def determine_object_pos(env, object_type: str):
+  """Convinence hacky function to determine the goal location."""
+  from minigrid.core.world_object import Goal
+  from minigrid.core.world_object import Door
+  from minigrid.core.world_object import Key
+  type2object = dict(goal=Goal, key=Key, door=Door)
+  for i in range(env.grid.width):
+    for j in range(env.grid.height):
+      tile = env.grid.get(i, j)
+      if isinstance(tile, type2object[object_type]):
+          return i, j
+
+
 def determine_is_door_open(env):
   """Convinence hacky function to determine the goal location."""
   from minigrid.core.world_object import Door
@@ -198,6 +213,29 @@ def get_open_grid_positions(env):
   return open_positions
 
 
+def search_for_key(env):
+  from minigrid.core.world_object import Key
+  for i in range(env.grid.width):
+    for j in range(env.grid.height):
+      tile = env.grid.get(i, j)
+      if isinstance(tile, Key):
+        return tile
+
+
+def pickup_key(env):
+  key_cell = search_for_key(env)
+  env.unwrapped.carrying = key_cell
+  key_pos = np.asarray(env.unwrapped.carrying.cur_pos).copy()
+  env.unwrapped.carrying.cur_pos = np.array([-1, -1])
+  env.unwrapped.grid.set(key_pos[0], key_pos[1], None)
+
+
+def door_key_get_states_with_key():
+  with open('Minigrid-DoorKey-16x16-v0-some-states-with-key.pkl', 'rb') as f:
+    pos2obs = pickle.load(f)
+  return pos2obs
+
+
 def four_rooms_get_room_centers():
   return [(5, 5), (14, 5), (5, 14), (14, 14)]
 
@@ -207,11 +245,14 @@ def minigrid_open_grid_subgoals():
 
 
 def minigrid_doorkey_subgoals(env):
-  return [
-    {'has_key': True},  # get the key
-    {'door_open': True},  # open the door
-    {'player_pos': determine_goal_pos(env)}  # go to the goal
-  ]
+  obj_types = ['key', 'door', 'goal']
+  return [determine_object_pos(env, obj) for obj in obj_types]
+
+
+def load_doorkey_subgoal_observations():
+  with open('MiniGrid-DoorKey-16x16-v0-seed42-goals.pkl', 'rb') as f:
+    pos2obs = pickle.load(f)
+  return pos2obs
 
 
 def environment_builder(

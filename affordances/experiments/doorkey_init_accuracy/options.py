@@ -8,6 +8,7 @@ from affordances.agent.hrl.option import Option
 from affordances.agent.rainbow.rainbow import Rainbow
 from affordances.init_learners.gvf.init_gvf import GoalConditionedInitiationGVF
 from affordances.goal_attainment.attainment_classifier import DiscreteInfoAttainmentClassifier
+from affordances.domains.minigrid import load_doorkey_subgoal_observations
 
 
 class AgentOverOptions:
@@ -53,8 +54,7 @@ class AgentOverOptions:
       env_steps, epsilon_decay_steps, final_epsilon)
     
     self.initiation_gvf = self.create_initiation_learner()
-    # self.subgoals = self.minigrid_get_subgoals(randomize_direction=False)  # TODO(ab)
-    self.subgoals = self.get_subgoals()
+    self.subgoals = self.door_key_get_goal_classifiers()
     self.options = self.create_options()  # TODO: create global option
 
   def update_initiation_gvf(self, episode_duration):
@@ -93,48 +93,25 @@ class AgentOverOptions:
       uncertainty_type=self._uncertainty_type
     )
   
-  def get_subgoal_positions_for_6x6_gridworld(self):
-    return [(0, 5), (5, 0), (3, 3), (5, 5)]
-  
-  def get_subgoal_positions_for_13x13_gridworld(self):
-    return [(0,12), (12,0), (6,6), (12,12)]
- 
-  def get_subgoals(self):  # for montezuma
-    pos2goals = {}  # pos -> (obs, info)
-    for state_dict in self._rams:
-      pos = state_dict['player_pos']
-      obs, info = self._env.reset(ram=state_dict['ram'], state=state_dict['state'])
-      pos2goals[pos] = (obs, info)
-    return pos2goals
-  
-  def minigrid_get_subgoals(self, randomize_direction):
-    pos2goals = {}  # pos -> (obs, info)
-    for state_dict in self._rams:
-      pos = state_dict['player_pos']
-      obs, info = self._env.reset_to(
-        pos,
-        randomize_direction=randomize_direction
-      )
-      pos2goals[pos] = (obs, info)
-    return pos2goals
-  
   def door_key_get_goal_classifiers(self):
-    from affordances.domains.minigrid import minigrid_doorkey_subgoals
+    """For each subgoal, create the subgoal_info, subgoal_obs and classifier."""
+
     goal_attainment_classifiers = []
-    for subgoal_dict in minigrid_doorkey_subgoals(self._env):
-      clf = DiscreteInfoAttainmentClassifier(list(subgoal_dict.keys())[0])
-      goal_attainment_classifiers.append(clf)
+    pos2obs = load_doorkey_subgoal_observations()
+    for state_dict in self._rams:
+      pos = state_dict['player_pos']
+      clf = DiscreteInfoAttainmentClassifier('player_pos')
+      obs = pos2obs[pos]
+      goal_attainment_classifiers.append((state_dict, obs, clf))
     return goal_attainment_classifiers
 
   def create_options(self) -> list:
     options = []
-    goal_attainment_clf = DiscreteInfoAttainmentClassifier("player_pos")
-    for i, pos in enumerate(self.subgoals):
-      subgoal_obs, subgoal_info = self.subgoals[pos]
+    for i, (subgoal_info, subgoal_obs, goal_clf) in enumerate(self.subgoals):
       option = Option(i + 1,  # Assuming that none of these are global-option
                       self.uvfa_policy,
                       self.initiation_gvf,
-                      goal_attainment_clf,
+                      goal_clf,
                       self._gestation_period,
                       self._timeout,
                       exploration_bonus_scale=0,
