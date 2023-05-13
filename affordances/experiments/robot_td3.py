@@ -1,9 +1,11 @@
 import os
 import sys 
+import copy
 import argparse
 
 import torch
 import numpy as np 
+from tqdm import tqdm
 
 from affordances.utils import utils
 from affordances.agent.td3.td3 import TD3
@@ -82,7 +84,23 @@ def relabel_trajectory(transitions):
   return relabeled_trajectory
 
 def count_uncertainty(counts):
-    return 1.0 / np.sqrt(counts + 1.0)
+  return 1.0 / np.sqrt(counts + 1.0)
+
+def kernel_count(states, memory, eps=1e-3, c=1e-3, k=2):
+  # TODO: moving average
+  # TODO: cluster
+  r_t = np.zeros(len(states))
+  for i, state in enumerate(states):
+    dists = sorted([np.linalg.norm(state - m) for m in memory])
+    dists = dists[:k]
+    dists = np.array(dists)**2
+    if sum(dists) > 0:
+      dists = dists / np.mean(dists)
+    Ks = eps / (dists + eps)
+    denom = np.sqrt(np.sum(Ks)) + c
+    r_t[i] = 1 / denom
+    print(dists)
+  return r_t
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser()
@@ -105,6 +123,7 @@ if __name__ == '__main__':
   parser.add_argument('--segment', type=utils.boolify, default=False)
   parser.add_argument('--render', type=utils.boolify, default=False)
   parser.add_argument('--vis_init_set', type=utils.boolify, default=False)
+  parser.add_argument('--eval_accuracy', type=utils.boolify, default=False)
   args = parser.parse_args()
   print(args)
 
@@ -179,25 +198,30 @@ if __name__ == '__main__':
   grasp_success = np.zeros(len(grasps))
 
   # train
+  EVAL_FREQ = len(grasp_qpos)
   episodic_rewards = []
   episodic_success = []
+  states_attempted = []
+  accuracy_log = []
+  
   n_steps = 0
-  for episode in range(args.n_episodes):
+  for episode in range(args.n_episodes + 1):
     sys.stdout.flush()
-    done = False
-    episode_reward = 0.
 
     # score
     grasp_scores = init_learner.score(grasp_state_vectors)
 
     # maybe bonus
     if args.uncertainty == "count_qpos":
-        bonus = count_uncertainty(qpos_counts)
-        grasp_scores += args.bonus_scale * bonus
+      bonus = count_uncertainty(qpos_counts)    
     elif args.uncertainty == "count_grasp":
-        bonus = count_uncertainty(grasp_counts)
-        bonus = np.repeat(bonus, n_qpos_per_grasp)
-        grasp_scores += args.bonus_scale * bonus
+      bonus = count_uncertainty(grasp_counts)
+      bonus = np.repeat(bonus, n_qpos_per_grasp)
+    elif args.uncertainty == "kernel":
+      bonus = kernel_count(grasp_qpos, states_attempted)
+    else:
+      bonus = 0.
+    grasp_scores += args.bonus_scale * bonus
 
     # maybe vis 
     if args.init_learner != "random" and args.vis_init_set and episode % 500 == 0:
@@ -205,11 +229,38 @@ if __name__ == '__main__':
       env.reset()
       env.render_states(grasp_qpos[mask], ep_num=episode, fpath=g_log_dir)
 
+    # maybe eval accuracy 
+    if args.init_learner != "random" and args.eval_accuracy and episode % EVAL_FREQ == 0:
+      accuracy = []
+      num_success = 0
+      num_acc = 0 
+      size = sum(grasp_scores > init_learner.optimistic_threshold)
+      for i, state in tqdm(enumerate(grasp_qpos)):
+        obs = env.reset_to_joint_state(state)
+        done = False
+        prediction = grasp_scores[i] > init_learner.optimistic_threshold
+        while not done:
+          action = agent.act(obs)
+          next_obs, reward, done, info = env.step(action)
+          obs = next_obs
+          success = info['success']
+          if success:
+            assert done
+        accuracy.append( (success, prediction) )
+        num_success += success
+        num_acc += (success == prediction)
+      num_acc = num_acc / len(grasp_scores)
+      accuracy_log.append(accuracy)
+      print(f'Evaluation: Accuracy {num_acc}, Pred Size {size}/{len(grasp_scores)}, True Size {num_success}/{len(grasp_scores)}')
+
     # reset 
+    done = False
+    episode_reward = 0.
     selected_idx = sample_func(grasp_scores)
     selected_qpos = grasp_qpos[selected_idx]
     selected_grasp_idx = selected_idx // n_qpos_per_grasp
     obs = env.reset_to_joint_state(selected_qpos)
+    states_attempted.append(selected_qpos)
     
     trajectory = []  # (s, a, r, s', info)
     while not done:
@@ -245,7 +296,7 @@ if __name__ == '__main__':
       init_learner.add_trajectory(trajectory, success)
       init_learner.update(initiation_gvf=init_gvf)
 
-    if episode > 0 and episode % 10 == 0:
+    if episode % 10 == 0:
       utils.safe_zip_write(
         os.path.join(g_log_dir, f'log_seed{args.seed}.pkl'),
         dict(
@@ -258,7 +309,8 @@ if __name__ == '__main__':
             grasp_counts=grasp_counts,
             grasp_success=grasp_success,
             qpos_counts=qpos_counts,
-            qpos_success=qpos_success
+            qpos_success=qpos_success,
+            accuracy=accuracy_log
           )
       )
 
