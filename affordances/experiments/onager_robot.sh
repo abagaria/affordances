@@ -1,3 +1,127 @@
+onager prelaunch +jobname 5-14-class-count-qpos-slide-binary \
+    +command "python -m affordances.experiments.robot_td3 \
+    --experiment_name=5-14-class-count-qpos-slide-binary \
+    --n_episodes=10000 \
+    --log_dir=/gpfs/data/gdk/babbatem/ \
+    --vis_init_set False \
+    --eval_accuracy True" \
+    +arg --environment_name SlideCIP \
+    +arg --init_learner binary \
+    +arg --seed 4 \
+    +arg --uncertainty count_qpos \
+    +arg --bonus_scale 0.1 \
+    +arg --gestation 1 5 \
+    +tag --sub_dir
+
+onager prelaunch +jobname 5-14-class-count-qpos-slide-weighted \
+    +command "python -m affordances.experiments.robot_td3 \
+    --experiment_name=5-14-class-count-qpos-slide-weighted \
+    --n_episodes=10000 \
+    --log_dir=/gpfs/data/gdk/babbatem/ \
+    --vis_init_set False \
+    --eval_accuracy True" \
+    +arg --environment_name SlideCIP \
+    +arg --init_learner weighted-binary \
+    +arg --seed 4 \
+    +arg --uncertainty count_qpos \
+    +arg --bonus_scale 0.5 \
+    +arg --gestation 5 \
+    +tag --sub_dir
+
+onager prelaunch +jobname 5-14-class-count-qpos-lever-binary \
+    +command "python -m affordances.experiments.robot_td3 \
+    --experiment_name=5-14-class-count-qpos-lever-binary \
+    --n_episodes=5000 \
+    --log_dir=/gpfs/data/gdk/babbatem/ \
+    --vis_init_set False \
+    --eval_accuracy True" \
+    +arg --environment_name LeverCIP \
+    +arg --init_learner binary \
+    +arg --seed 4 \
+    +arg --uncertainty count_qpos \
+    +arg --bonus_scale 0.1 \
+    +arg --gestation 5 \
+    +tag --sub_dir
+
+onager prelaunch +jobname 5-14-class-count-qpos-lever-weighted \
+    +command "python -m affordances.experiments.robot_td3 \
+    --experiment_name=5-14-class-count-qpos-lever-weighted \
+    --n_episodes=5000 \
+    --log_dir=/gpfs/data/gdk/babbatem/ \
+    --vis_init_set False \
+    --eval_accuracy True" \
+    +arg --environment_name LeverCIP \
+    +arg --init_learner weighted-binary \
+    +arg --seed 4 \
+    +arg --uncertainty count_qpos \
+    +arg --bonus_scale 0.5 \
+    +arg --gestation 5 \
+    +tag --sub_dir
+
+onager prelaunch +jobname 5-14-class-none-slide \
+    +command "python -m affordances.experiments.robot_td3 \
+    --experiment_name=5-14-class-none-slide \
+    --n_episodes=10000 \
+    --log_dir=/gpfs/data/gdk/babbatem/ \
+    --vis_init_set False \
+    --eval_accuracy True" \
+    +arg --environment_name SlideCIP \
+    +arg --init_learner binary weighted-binary \
+    +arg --seed 4  \
+    +arg --uncertainty none \
+    +arg --bonus_scale 0 \
+    +arg --gestation 5 \
+    +tag --sub_dir
+
+onager prelaunch +jobname 5-14-class-none-lever \
+    +command "python -m affordances.experiments.robot_td3 \
+    --experiment_name=5-14-class-none-lever \
+    --n_episodes=5000 \
+    --log_dir=/gpfs/data/gdk/babbatem/ \
+    --vis_init_set False \
+    --eval_accuracy True" \
+    +arg --environment_name LeverCIP \
+    +arg --init_learner binary weighted-binary \
+    +arg --seed 4 \
+    +arg --uncertainty none \
+    +arg --bonus_scale 0 \
+    +arg --gestation 5 \
+    +tag --sub_dir
+
+-----------
+onager prelaunch +jobname 5-13-class-count-qpos-door \
+    +command "python -m affordances.experiments.robot_td3 \
+    --experiment_name=5-13-class-count-qpos-door \
+    --n_episodes=5000 \
+    --log_dir=/gpfs/data/gdk/babbatem/ \
+    --vis_init_set False \
+    --eval_accuracy True" \
+    +arg --environment_name DoorCIP \
+    +arg --init_learner binary weighted-binary \
+    +arg --seed 1 2 3 4 \
+    +arg --uncertainty count_qpos \
+    +arg --bonus_scale 0.1 0.25 0.5 \
+    +arg --gestation 5 \
+    +tag --sub_dir
+
+onager prelaunch +jobname 5-13-class-none-door \
+    +command "python -m affordances.experiments.robot_td3 \
+    --experiment_name=5-13-class-none-door \
+    --n_episodes=5000 \
+    --log_dir=/gpfs/data/gdk/babbatem/ \
+    --vis_init_set False \
+    --eval_accuracy True" \
+    +arg --environment_name DoorCIP \
+    +arg --init_learner binary weighted-binary \
+    +arg --seed 1 2 3 4 \
+    +arg --uncertainty none \
+    +arg --bonus_scale 0 \
+    +arg --gestation 5 \
+    +tag --sub_dir
+
+
+
+
 ---------
 # TODO: Door with best 
 # 2 * 2 * 3 * 4 * 3
