@@ -18,12 +18,14 @@ sns.set_palette('colorblind')
 # IK = False
 EVAL_FREQ = 10 
 # TASKS = ["DoorCIP", "LeverCIP", "DrawerCIP", "SlideCIP"]
-TASKS = ["DoorCIP", "LeverCIP", "SlideCIP"]
+# TASKS = ["DoorCIP", "LeverCIP", "SlideCIP"]
+# TASKS=["LeverCIP"]
+TASKS=["SlideCIP"]
 # mask = {"optimal_ik":False,
 #         "environment_name": "Door",
 #         "init_learner":"binary"}
 # mask={"sampler":"max", "init_learner":"gvf"}
-mask={}
+mask={"sampler":"sum"}
 
 def get_data(rootDirs, conditions=None, task=None, smoothen=100):
   scores = {}
@@ -65,6 +67,9 @@ def get_data(rootDirs, conditions=None, task=None, smoothen=100):
         log_df['tag']=str(count)
 
         # defaults
+        if job_data['uncertainty'] == 'none':
+          job_data['bonus_scale'] = 0
+
         if 'uncertainty' not in job_data.keys():
           job_data['uncertainty'] = 'none'
 
@@ -73,6 +78,7 @@ def get_data(rootDirs, conditions=None, task=None, smoothen=100):
 
         if 'bonus_scale' not in job_data.keys():
           job_data['bonus_scale'] = 1
+
 
         if 'gestation' not in job_data.keys():
           job_data['gestation'] = 1
@@ -115,21 +121,38 @@ if __name__ == '__main__':
       data = data[ data[key] == val ]
 
     y_var = "success"
+
+    # classification plots 
+    # g = sns.relplot(x='episode',
+    #                 y=y_var, 
+    #                 kind='line',
+    #                 data=data,
+    #                 alpha=0.8,
+    #                 hue="condition",
+    #                 hue_order=conditions.keys(),
+    #                 # col="environment_name",
+    #                 # row="segment",
+    #                 # style="optimal_ik",
+    #                 # style='sampler',
+    #                 row="only_reweigh_negatives",
+    #                 # hue='bonus_scale',
+    #                 col='gestation',
+    #                 # style='init_learner',
+    #                 facet_kws={"sharex":False,"sharey":True},
+    #                 errorbar="se"
+    # )
     g = sns.relplot(x='episode',
                     y=y_var, 
                     kind='line',
                     data=data,
                     alpha=0.8,
-                    hue="condition",
-                    hue_order=conditions.keys(),
-                    # col="environment_name",
-                    # row="segment",
-                    # style="optimal_ik",
-                    # style='sampler',
-                    col="only_reweigh_negatives",
-                    # hue='bonus_scale',
-                    row='gestation',
-                    # style='init_learner',
+                    # hue="condition",
+                    # hue_order=conditions.keys(),
+                    col="uncertainty",
+                    row="init_learner",
+                    hue='bonus_scale',
+                    hue_order=sorted(np.unique(data['bonus_scale'])),
+                    style='init_learner',
                     facet_kws={"sharex":False,"sharey":True},
                     errorbar="se"
     )
