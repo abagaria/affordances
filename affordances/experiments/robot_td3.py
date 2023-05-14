@@ -55,6 +55,7 @@ def create_init_learner(args, env, agent):
     raise ValueError("invalid init_learner")
 
 def create_gvf(args, env, agent):
+  # TODO: instance weights uncertainty...
   return InitiationGVF(
     agent.get_actions, 
     env.action_space.shape[0],
@@ -315,9 +316,9 @@ if __name__ == '__main__':
       )
 
   # save 
-  init_learner_fname = os.path.join(g_log_dir, 'init.pth')
-  if args.init_learner != "random":
-    init_learner.save(init_learner_fname)
-  agent.agent.save(g_log_dir)
+  # init_learner_fname = os.path.join(g_log_dir, 'init.pth')
+  # if args.init_learner != "random":
+  #   init_learner.save(init_learner_fname)
+  # agent.agent.save(g_log_dir)
 
 
