@@ -78,7 +78,7 @@ TASKS = ["DoorCIP", "LeverCIP", "SlideCIP"]
 # mask={"sampler":"sum"}
 mask={}
 
-def get_data(rootDirs, conditions=None, task=None, smoothen=500):
+def get_data(rootDirs, conditions=None, task=None, smoothen=100):
   scores = {}
   runs = []
   count=0
@@ -206,7 +206,7 @@ if __name__ == '__main__':
   plt.subplots_adjust(bottom=0.22)
 
   # sns.move_legend(g, "lower center", bbox_to_anchor=[0.5, -0.1],
-  sns.move_legend(g, "lower center", bbox_to_anchor=[0.5, -0.0],
+  sns.move_legend(g, "lower center", bbox_to_anchor=[0.45, -0.0],
                 ncol=len(CONDITIONS.keys()), title=None, frameon=False,)
 
 
