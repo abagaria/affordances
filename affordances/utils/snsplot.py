@@ -15,17 +15,26 @@ sns.set_palette('colorblind')
 # sns.set(font_scale=1.0)
 # sns.set(rc={'figure.figsize':(11.7,8.27)})
 
-# IK = False
+OPTIMAL_IK = False
 EVAL_FREQ = 10 
+ACC_EVAL_FREQ = 250 if not OPTIMAL_IK else 50 
+
+# y_var = 'success'
+y_var = 'accuracy'
+# y_var = 'size'
+
 # TASKS = ["DoorCIP", "LeverCIP", "DrawerCIP", "SlideCIP"]
 # TASKS = ["DoorCIP", "LeverCIP", "SlideCIP"]
+TASKS = ["LeverCIP", "SlideCIP" ]
+# TASKS = ["DoorCIP"]
 # TASKS=["LeverCIP"]
-TASKS=["SlideCIP"]
+# TASKS=["SlideCIP"]
 # mask = {"optimal_ik":False,
 #         "environment_name": "Door",
 #         "init_learner":"binary"}
 # mask={"sampler":"max", "init_learner":"gvf"}
-mask={"sampler":"sum"}
+# mask={"sampler":"sum"}
+mask={}
 
 def get_data(rootDirs, conditions=None, task=None, smoothen=100):
   scores = {}
@@ -63,12 +72,25 @@ def get_data(rootDirs, conditions=None, task=None, smoothen=100):
         log_df = pd.DataFrame()
         log_df['success'] = moving_average(eval_successes, n=smoothen)
         log_df['reward'] = moving_average(eval_rewards, n=smoothen)
-        log_df['episode'] = np.arange(len(log_df)) + EVAL_FREQ
+        log_df['episode'] = np.arange(len(eval_rewards)) # TODO: + EVAL_FREQ for runs older than 5/13
         log_df['tag']=str(count)
+
+        # compute accuracy:
+        # stored as (success, prediction)
+        if job_data['init_learner'] != 'random':
+          acc_list = eval_files['accuracy']
+          eval_acc_eps = np.arange(len(acc_list)) * ACC_EVAL_FREQ
+          acc_array = np.array(acc_list).astype(float) # (n_evals, n_qpos, 2)
+          acc_by_ep = np.mean(acc_array[:,:,0] == acc_array[:,:,1], axis=1)
+          size_by_ep = np.sum(acc_array[:,:,0], axis=1)
+          N = len(eval_rewards)
+          log_df['size'] = np.repeat(size_by_ep, ACC_EVAL_FREQ)[:N]
+          log_df['accuracy'] = np.repeat(acc_by_ep, ACC_EVAL_FREQ)[:N]
 
         # defaults
         if job_data['uncertainty'] == 'none':
           job_data['bonus_scale'] = 0
+          job_data['uncertainty'] = 'count_qpos'
 
         if 'uncertainty' not in job_data.keys():
           job_data['uncertainty'] = 'none'
@@ -81,7 +103,7 @@ def get_data(rootDirs, conditions=None, task=None, smoothen=100):
 
 
         if 'gestation' not in job_data.keys():
-          job_data['gestation'] = 1
+          job_data['gestation'] = 0
 
         if job_data['init_learner'] == 'random':
           job_data['sampler'] = 'sum'
@@ -120,8 +142,6 @@ if __name__ == '__main__':
     for key, val in mask.items():
       data = data[ data[key] == val ]
 
-    y_var = "success"
-
     # classification plots 
     # g = sns.relplot(x='episode',
     #                 y=y_var, 
@@ -130,32 +150,47 @@ if __name__ == '__main__':
     #                 alpha=0.8,
     #                 hue="condition",
     #                 hue_order=conditions.keys(),
-    #                 # col="environment_name",
-    #                 # row="segment",
-    #                 # style="optimal_ik",
-    #                 # style='sampler',
     #                 row="only_reweigh_negatives",
-    #                 # hue='bonus_scale',
     #                 col='gestation',
     #                 # style='init_learner',
     #                 facet_kws={"sharex":False,"sharey":True},
     #                 errorbar="se"
     # )
     g = sns.relplot(x='episode',
-                    y=y_var, 
-                    kind='line',
-                    data=data,
-                    alpha=0.8,
-                    # hue="condition",
-                    # hue_order=conditions.keys(),
-                    col="uncertainty",
-                    row="init_learner",
-                    hue='bonus_scale',
-                    hue_order=sorted(np.unique(data['bonus_scale'])),
-                    style='init_learner',
-                    facet_kws={"sharex":False,"sharey":True},
-                    errorbar="se"
+                y=y_var, 
+                kind='line',
+                data=data,
+                alpha=0.8,
+                # hue="condition",
+                # hue_order=conditions.keys(),
+                row="init_learner",
+                col="gestation",
+                hue='bonus_scale',
+                hue_order=sorted(np.unique(data['bonus_scale'])),
+                # style='init_learner',
+                facet_kws={"sharex":False,"sharey":True},
+                errorbar="se"
     )
+
+
+    # GVF count uncertainty plots 
+    # g = sns.relplot(x='episode',
+    #                 y=y_var, 
+    #                 kind='line',
+    #                 data=data,
+    #                 alpha=0.8,
+    #                 # hue="condition",
+    #                 # hue_order=conditions.keys(),
+    #                 col="uncertainty",
+    #                 row="init_learner",
+    #                 hue='bonus_scale',
+    #                 hue_order=sorted(np.unique(data['bonus_scale'])),
+    #                 style='init_learner',
+    #                 facet_kws={"sharex":False,"sharey":True},
+    #                 errorbar="se"
+    # )
+
+
     plt.suptitle(task)
     # g.set_titles(col_template = '{col_name}')
     g.set_axis_labels( "Episode" , y_var)

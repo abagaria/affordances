@@ -96,7 +96,8 @@ def get_plot_params(array):
 def moving_average(a, n=25):
   ret = np.cumsum(a, dtype=float)
   ret[n:] = ret[n:] - ret[:-n]
-  return ret[n-1:] / n
+  # return ret[n-1:] / n
+  return ret / n 
 
 
 def smoothen_data(scores, n=10):
