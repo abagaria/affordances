@@ -12,13 +12,13 @@ conditions = {
                         'optimal_ik':IK,
                         'segment':False
                     }, 
-                'GVF':
+                'GVF (Ours)':
                     {
                         'init_learner': 'gvf',
                         'optimal_ik':IK,
                         'segment':False
                     },
-                'Weighted':
+                'Weighted (Ours)':
                     {
                         'init_learner': 'weighted-binary',
                         'optimal_ik':IK,
