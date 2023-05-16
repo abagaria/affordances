@@ -10,11 +10,11 @@ import matplotlib.pyplot as plt
 
 from affordances.utils.plotting_script import generate_plot, truncate, moving_average
 
-sns.set_palette('colorblind')
-sns.set(font_scale=1.5)
-sns.set(style='whitegrid')
-# sns.set(rc={'figure.figsize':(11.7,8.27)})
-# sns.set_theme(context='poster', style='whitegrid', palette='colorblind')
+# sns.set_palette('colorblind')
+# sns.set(font_scale=1.5)
+# sns.set(style='whitegrid')
+sns.set(rc={'figure.figsize':(15, 8)})
+sns.set_theme(context='poster', style='whitegrid', palette='colorblind')
 
 OPTIMAL_IK = False
 EVAL_FREQ = 10 
@@ -22,11 +22,11 @@ ACC_EVAL_FREQ = 250 if not OPTIMAL_IK else 50
 RUN_LENS = {'DoorCIP': 5001, 'SlideCIP':10001, 'LeverCIP': 5001}
 
 CONDITIONS={
-                # 'Baseline Random': 
-                #     {
-                #         'init_learner': 'random',
-                #         'uncertainty':'none'
-                #     },
+                'Baseline Random': 
+                    {
+                        'init_learner': 'random',
+                        'uncertainty':'none'
+                    },
                 'Baseline Binary':
                     {
                         'init_learner': 'binary',
@@ -61,10 +61,10 @@ CONDITIONS={
 CONDITION_NAMES = list(CONDITIONS.keys())
 CONDITION_NAMES.reverse()
 
-# y_var = 'Success Rate
+y_var = 'Success Rate'
 # y_var = 'Reward'
 # y_var = 'Accuracy'
-y_var = 'Size'
+# y_var = 'Size'
 
 # TASKS = ["DoorCIP", "LeverCIP", "DrawerCIP", "SlideCIP"]
 # TASKS = ["DoorCIP", "LeverCIP", "SlideCIP"]
@@ -79,7 +79,7 @@ TASKS = ["DoorCIP", "LeverCIP", "SlideCIP"]
 # mask={"sampler":"sum"}
 mask={}
 
-def get_data(rootDirs, conditions=None, task=None, smoothen=100):
+def get_data(rootDirs, conditions=None, task=None, smoothen=100, downsample=100):
   scores = {}
   runs = []
   count=0
@@ -123,6 +123,15 @@ def get_data(rootDirs, conditions=None, task=None, smoothen=100):
           log_df['Success Rate'] = moving_average(eval_successes, n=smoothen)
           log_df['Reward'] = moving_average(eval_rewards, n=smoothen)
           log_df['episode'] = np.arange(len(eval_rewards)) 
+
+          # maybe map slide 10k -> 5k episodes
+          # if job_data['environment_name'] == 'SlideCIP':
+          #   log_df = log_df.iloc[::2,:]
+          #   log_df['episode'] = log_df['episode'] / 2.
+          
+          log_df = log_df.iloc[::downsample, :] 
+          
+
         elif y_var == 'Accuracy' or y_var == 'Size':
 
           
@@ -200,6 +209,7 @@ if __name__ == '__main__':
   for key, val in mask.items():
     data = data[ data[key] == val ]
 
+  # plt.figure(figsize=(15,8))
   g = sns.relplot(x='episode',
               y=y_var, 
               kind='line',
@@ -219,27 +229,11 @@ if __name__ == '__main__':
   plt.subplots_adjust(bottom=0.22)
 
   # sns.move_legend(g, "lower center", bbox_to_anchor=[0.5, -0.1],
-  sns.move_legend(g, "lower center", bbox_to_anchor=[0.45, -0.0],
-                ncol=len(CONDITIONS.keys()), title=None, frameon=False,)
-
-
-  # Adjust the legend position for each subplot
-  # for ax in g.axes.flat:
-  #   ax.legend().remove()
-  
-  # # Create a single legend centered below the subplots
-  # legend_handles, legend_labels = g.axes.flat[0].get_legend_handles_labels()
-  # legend = g.fig.legend(legend_handles, legend_labels,
-  #                     bbox_to_anchor=(0.5, -0.1), 
-  #                     loc='lower center', ncol=len(conditions.keys()),
-  #                     frameon=False)
-
-  # # Remove the original legend from the figure
-  # g.fig.get_axes()[0].legend_.remove()
-
+  sns.move_legend(g, "lower center", bbox_to_anchor=[0.4, -0.3],
+                ncol=len(CONDITIONS.keys())//2, title=None, frameon=False,)
   
 
-  plt.savefig(f'{args.path[0]}/{y_var}.png', bbox_inches='tight')
+  plt.savefig(f'{args.path[0]}/combined_poster{y_var}.png', bbox_inches='tight')
   plt.show()
   # Akhil's logic: 
   # ideal_len = 4991
