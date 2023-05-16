@@ -22,11 +22,11 @@ ACC_EVAL_FREQ = 250 if not OPTIMAL_IK else 50
 RUN_LENS = {'DoorCIP': 5001, 'SlideCIP':10001, 'LeverCIP': 5001}
 
 CONDITIONS={
-                'Baseline Random': 
-                    {
-                        'init_learner': 'random',
-                        'uncertainty':'none'
-                    },
+                # 'Baseline Random': 
+                #     {
+                #         'init_learner': 'random',
+                #         'uncertainty':'none'
+                #     },
                 'Baseline Binary':
                     {
                         'init_learner': 'binary',
@@ -61,9 +61,10 @@ CONDITIONS={
 CONDITION_NAMES = list(CONDITIONS.keys())
 CONDITION_NAMES.reverse()
 
-y_var = 'Success Rate'
-# y_var = 'accuracy'
-# y_var = 'size'
+# y_var = 'Success Rate
+# y_var = 'Reward'
+# y_var = 'Accuracy'
+y_var = 'Size'
 
 # TASKS = ["DoorCIP", "LeverCIP", "DrawerCIP", "SlideCIP"]
 # TASKS = ["DoorCIP", "LeverCIP", "SlideCIP"]
@@ -116,25 +117,37 @@ def get_data(rootDirs, conditions=None, task=None, smoothen=100):
 
 
         # parse reward
+        # TODO: + EVAL_FREQ for runs older than 5/13
         log_df = pd.DataFrame()
-        log_df['Success Rate'] = moving_average(eval_successes, n=smoothen)
-        log_df['reward'] = moving_average(eval_rewards, n=smoothen)
-        log_df['episode'] = np.arange(len(eval_rewards)) # TODO: + EVAL_FREQ for runs older than 5/13
-        log_df['tag']=str(count)
+        if y_var == 'Success Rate' or y_var=='Reward':
+          log_df['Success Rate'] = moving_average(eval_successes, n=smoothen)
+          log_df['Reward'] = moving_average(eval_rewards, n=smoothen)
+          log_df['episode'] = np.arange(len(eval_rewards)) 
+        elif y_var == 'Accuracy' or y_var == 'Size':
 
+          
         # compute accuracy:
         # stored as (success, prediction)
-        if job_data['init_learner'] != 'random':
+          assert job_data['init_learner'] != 'random'
           acc_list = eval_files['accuracy']
           eval_acc_eps = np.arange(len(acc_list)) * ACC_EVAL_FREQ
           acc_array = np.array(acc_list).astype(float) # (n_evals, n_qpos, 2)
           acc_by_ep = np.mean(acc_array[:,:,0] == acc_array[:,:,1], axis=1)
           size_by_ep = np.sum(acc_array[:,:,0], axis=1)
-          N = len(eval_rewards)
-          log_df['size'] = np.repeat(size_by_ep, ACC_EVAL_FREQ)[:N]
-          log_df['accuracy'] = np.repeat(acc_by_ep, ACC_EVAL_FREQ)[:N]
+          log_df['Size'] = size_by_ep
+          log_df['Accuracy'] = acc_by_ep
+          log_df['episode'] = eval_acc_eps
+        else:
+          assert y_var in ['Success Rate', 'Reward', 'Size', 'Accuracy']
+        
+        log_df['tag']=str(count)
 
-        # defaults
+        shorten_mask = log_df['episode'] < max_length
+        log_df = log_df[shorten_mask]
+
+        # defaults 
+
+        # maybe convert uncertainty = 'none' to bonus_scale = 0
         # if job_data['uncertainty'] == 'none':
         #   job_data['bonus_scale'] = 0
         #   job_data['uncertainty'] = 'count_qpos'
@@ -178,7 +191,7 @@ def get_data(rootDirs, conditions=None, task=None, smoothen=100):
   data = data.astype({"bonus_scale" : str})
   return data, scores
 
-if __name__ == '__main__':
+if __name__ == '__main__': 
   parser = argparse.ArgumentParser()
   parser.add_argument('path', nargs='+', default=[])
   args = parser.parse_args()
