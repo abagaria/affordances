@@ -38,7 +38,7 @@ def make_robosuite_env(task,
     options["m_constant"] = 1
     options["ttt_constant"] = 1
     options["horizon"] = 250
-    options["reward_shaping"] = False
+    options["reward_shaping"] = True
     options["hard_reset"] = True if not render else False
 
     # create and wrap env 
