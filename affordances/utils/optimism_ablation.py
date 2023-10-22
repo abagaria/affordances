@@ -10,11 +10,14 @@ import matplotlib.pyplot as plt
 
 from affordances.utils.plotting_script import generate_plot, truncate, moving_average
 
-sns.set_palette('colorblind')
-sns.set(font_scale=1.5)
-sns.set(style='whitegrid')
-# sns.set(rc={'figure.figsize':(11.7,8.27)})
+# sns.set_palette('colorblind')
+# sns.set(font_scale=1.5)
+# sns.set(style='whitegrid')
+sns.set(rc={'figure.figsize':(15, 8)})
 # sns.set_theme(context='poster', style='whitegrid', palette='colorblind')
+modified_palette = sns.color_palette('colorblind')
+modified_palette.pop(0)
+sns.set_theme(context='talk', style='white', palette=modified_palette)
 
 OPTIMAL_IK = False
 EVAL_FREQ = 10 
@@ -22,48 +25,49 @@ ACC_EVAL_FREQ = 250 if not OPTIMAL_IK else 50
 RUN_LENS = {'DoorCIP': 5001, 'SlideCIP':10001, 'LeverCIP': 5001}
 
 CONDITIONS={
-                'Baseline Random': 
-                    {
-                        'init_learner': 'random',
-                        'uncertainty':'none'
-                    },
-                'Baseline Binary':
+                # 'Baseline Random': 
+                #     {
+                #         'init_learner': 'random',
+                #         'uncertainty':'none'
+                #     },
+                'Binary':
                     {
                         'init_learner': 'binary',
-                        'uncertainty':'none'
+                        # 'uncertainty':'none'
                     }, 
-                'GVF':
+                # 'NOT OPTIMISTIC GVF':
+                #     {
+                #         'init_learner': 'gvf',
+                #         'uncertainty':'none'
+                #     },
+                # 'NOT OPTIMISTIC Weighted':
+                #     {
+                #         'init_learner': 'weighted-binary',
+                #         'uncertainty':'none'
+                #     },   
+                # 'Optimistic Binary':
+                #     {
+                #         'init_learner': 'binary',
+                #         'uncertainty':'count_qpos'
+                #     }, 
+                'IVF':
                     {
                         'init_learner': 'gvf',
-                        'uncertainty':'none'
+                        # 'uncertainty':'count_qpos'
                     },
                 'Weighted':
                     {
                         'init_learner': 'weighted-binary',
-                        'uncertainty':'none'
-                    },   
-                'Optimistic Binary':
-                    {
-                        'init_learner': 'binary',
-                        'uncertainty':'count_qpos'
-                    }, 
-                'Optimistic GVF':
-                    {
-                        'init_learner': 'gvf',
-                        'uncertainty':'count_qpos'
-                    },
-                'Optimistic Weighted':
-                    {
-                        'init_learner': 'weighted-binary',
-                        'uncertainty':'count_qpos'
+                        # 'uncertainty':'count_qpos'
                     }, 
 }
 CONDITION_NAMES = list(CONDITIONS.keys())
-CONDITION_NAMES.reverse()
+# CONDITION_NAMES.reverse()
 
 y_var = 'Success Rate'
-# y_var = 'accuracy'
-# y_var = 'size'
+# y_var = 'Reward'
+# y_var = 'Accuracy'
+# y_var = 'Size'
 
 # TASKS = ["DoorCIP", "LeverCIP", "DrawerCIP", "SlideCIP"]
 # TASKS = ["DoorCIP", "LeverCIP", "SlideCIP"]
@@ -78,7 +82,7 @@ TASKS = ["DoorCIP", "LeverCIP", "SlideCIP"]
 # mask={"sampler":"sum"}
 mask={}
 
-def get_data(rootDirs, conditions=None, task=None, smoothen=100):
+def get_data(rootDirs, conditions=None, task=None, smoothen=500, downsample=100):
   scores = {}
   runs = []
   count=0
@@ -116,11 +120,49 @@ def get_data(rootDirs, conditions=None, task=None, smoothen=100):
 
 
         # parse reward
+        # TODO: + EVAL_FREQ for runs older than 5/13
         log_df = pd.DataFrame()
-        # log_df['Success Rate'] = [np.mean(eval_successes)]
-        eval_successes = moving_average(eval_successes, n=smoothen)
-        log_df['Success Rate'] = [eval_successes[-1]]
+        if y_var == 'Success Rate' or y_var=='Reward':
+          log_df['Success Rate'] = moving_average(eval_successes, n=smoothen)
+          log_df['Reward'] = moving_average(eval_rewards, n=smoothen)
+          log_df['episode'] = np.arange(len(eval_rewards)) 
+
+          # maybe map slide 10k -> 5k episodes
+          # if job_data['environment_name'] == 'SlideCIP':
+          #   log_df = log_df.iloc[::2,:]
+          #   log_df['episode'] = log_df['episode'] / 2.
+          
+          log_df = log_df.iloc[::downsample, :] 
+          
+
+        elif y_var == 'Accuracy' or y_var == 'Size':
+
+          
+        # compute accuracy:
+        # stored as (success, prediction)
+          assert job_data['init_learner'] != 'random'
+          acc_list = eval_files['accuracy']
+          eval_acc_eps = np.arange(len(acc_list)) * ACC_EVAL_FREQ
+          acc_array = np.array(acc_list).astype(float) # (n_evals, n_qpos, 2)
+          acc_by_ep = np.mean(acc_array[:,:,0] == acc_array[:,:,1], axis=1)
+          size_by_ep = np.sum(acc_array[:,:,0], axis=1)
+          log_df['Size'] = size_by_ep
+          log_df['Accuracy'] = acc_by_ep
+          log_df['episode'] = eval_acc_eps
+        else:
+          assert y_var in ['Success Rate', 'Reward', 'Size', 'Accuracy']
+        
         log_df['tag']=str(count)
+
+        shorten_mask = log_df['episode'] < max_length
+        log_df = log_df[shorten_mask]
+
+        # defaults 
+
+        # maybe convert uncertainty = 'none' to bonus_scale = 0
+        # if job_data['uncertainty'] == 'none':
+        #   job_data['bonus_scale'] = 0
+        #   job_data['uncertainty'] = 'count_qpos'
 
         if 'uncertainty' not in job_data.keys():
           job_data['uncertainty'] = 'none'
@@ -131,11 +173,17 @@ def get_data(rootDirs, conditions=None, task=None, smoothen=100):
         if 'bonus_scale' not in job_data.keys():
           job_data['bonus_scale'] = 1
 
+
         if 'gestation' not in job_data.keys():
           job_data['gestation'] = 0
 
         if job_data['init_learner'] == 'random':
           job_data['sampler'] = 'sum'
+
+        if job_data['uncertainty'] == 'count_qpos':
+          job_data['Optimism'] = True
+        else:
+          job_data['Optimism'] = False
 
         # fill in log_df
         for key, val in job_data.items():
@@ -160,59 +208,42 @@ def get_data(rootDirs, conditions=None, task=None, smoothen=100):
   data = data.astype({"bonus_scale" : str})
   return data, scores
 
-if __name__ == '__main__':
+if __name__ == '__main__': 
   parser = argparse.ArgumentParser()
   parser.add_argument('path', nargs='+', default=[])
   args = parser.parse_args()
 
-  i=1
-  for task in TASKS:
-    data, scores = get_data(args.path, conditions=CONDITIONS,task=task)  
-    for key, val in mask.items():
-      data = data[ data[key] == val ]
+  data, scores = get_data(args.path, conditions=CONDITIONS)  
+  for key, val in mask.items():
+    data = data[ data[key] == val ]
 
-    
-    i+=1
-    plt.figure(figsize=(15,8))
-    g = sns.barplot(x='condition',
-                y=y_var, 
-                data=data,
-                errorbar="se",
-                order=CONDITION_NAMES
-    )
-    plt.xlabel("")
-    plt.title(task[:-3])
-    plt.savefig(f'{args.path[0]}/barplot_{task}.png', bbox_inches='tight')
-    plt.show()
-  # g.set_titles(col_template = '{col_name}')
-    
+  # plt.figure(figsize=(15,8))
+  g = sns.relplot(x='episode',
+              y=y_var, 
+              kind='line',
+              data=data,
+              alpha=0.8,
+              hue="condition",
+              hue_order=CONDITION_NAMES,
+              col="environment_name",
+              col_order=["Door", "Lever", "Slide"],
+              row="Optimism",
+              facet_kws={"sharex":False,"sharey":True},
+              errorbar="se",
+  )
+  g.set_titles(col_template = '{col_name}')
+  g.set_axis_labels( "Episode" , y_var)
 
   # Adjust the spacing between subplots and legend
-  # plt.subplots_adjust(bottom=0.22)
+  # plt.subplots_adjust(bottom=0.15)
 
-  # sns.move_legend(g, "lower center", bbox_to_anchor=[0.5, -0.1],
-  # sns.move_legend(g, "lower center", bbox_to_anchor=[0.5, -0.0],
-  #               ncol=len(CONDITIONS.keys()), title=None, frameon=False,)
-
-
-  # Adjust the legend position for each subplot
-  # for ax in g.axes.flat:
-  #   ax.legend().remove()
-  
-  # # Create a single legend centered below the subplots
-  # legend_handles, legend_labels = g.axes.flat[0].get_legend_handles_labels()
-  # legend = g.fig.legend(legend_handles, legend_labels,
-  #                     bbox_to_anchor=(0.5, -0.1), 
-  #                     loc='lower center', ncol=len(conditions.keys()),
-  #                     frameon=False)
-
-  # # Remove the original legend from the figure
-  # g.fig.get_axes()[0].legend_.remove()
-
+  sns.move_legend(g, "lower center", bbox_to_anchor=[0.48, -0.05], ncol=len(CONDITION_NAMES), title=None, frameon=False,)
+  # sns.move_legend(g, "lower center",                 ncol=len(CONDITION_NAMES), title=None, frameon=False,)
   
 
-  # plt.savefig(f'{args.path[0]}/{y_var}.png', bbox_inches='tight')
-  # plt.show()
+  plt.savefig(f'{args.path[0]}/ablate_optimism_{y_var}.png', bbox_inches='tight')
+  plt.savefig(f'{args.path[0]}/ablate_optimism_{y_var}.svg', bbox_inches='tight')
+  plt.show()
   # Akhil's logic: 
   # ideal_len = 4991
   # for i, task in enumerate(TASKS):

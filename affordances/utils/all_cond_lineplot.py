@@ -14,7 +14,8 @@ from affordances.utils.plotting_script import generate_plot, truncate, moving_av
 # sns.set(font_scale=1.5)
 # sns.set(style='whitegrid')
 sns.set(rc={'figure.figsize':(15, 8)})
-sns.set_theme(context='poster', style='whitegrid', palette='colorblind')
+# sns.set_theme(context='poster', style='whitegrid', palette='colorblind')
+sns.set_theme(context='talk', style='white', palette='colorblind')
 
 OPTIMAL_IK = False
 EVAL_FREQ = 10 
@@ -32,34 +33,34 @@ CONDITIONS={
                         'init_learner': 'binary',
                         'uncertainty':'none'
                     }, 
-                'GVF':
+                # 'NOT OPTIMISTIC GVF':
+                #     {
+                #         'init_learner': 'gvf',
+                #         'uncertainty':'none'
+                #     },
+                # 'NOT OPTIMISTIC Weighted':
+                #     {
+                #         'init_learner': 'weighted-binary',
+                #         'uncertainty':'none'
+                #     },   
+                # 'Optimistic Binary':
+                #     {
+                #         'init_learner': 'binary',
+                #         'uncertainty':'count_qpos'
+                #     }, 
+                'IVF':
                     {
                         'init_learner': 'gvf',
-                        'uncertainty':'none'
+                        'uncertainty':'count_qpos'
                     },
                 'Weighted':
-                    {
-                        'init_learner': 'weighted-binary',
-                        'uncertainty':'none'
-                    },   
-                'Optimistic Binary':
-                    {
-                        'init_learner': 'binary',
-                        'uncertainty':'count_qpos'
-                    }, 
-                'Optimistic GVF':
-                    {
-                        'init_learner': 'gvf',
-                        'uncertainty':'count_qpos'
-                    },
-                'Optimistic Weighted':
                     {
                         'init_learner': 'weighted-binary',
                         'uncertainty':'count_qpos'
                     }, 
 }
 CONDITION_NAMES = list(CONDITIONS.keys())
-CONDITION_NAMES.reverse()
+# CONDITION_NAMES.reverse()
 
 y_var = 'Success Rate'
 # y_var = 'Reward'
@@ -79,7 +80,7 @@ TASKS = ["DoorCIP", "LeverCIP", "SlideCIP"]
 # mask={"sampler":"sum"}
 mask={}
 
-def get_data(rootDirs, conditions=None, task=None, smoothen=100, downsample=100):
+def get_data(rootDirs, conditions=None, task=None, smoothen=500, downsample=100):
   scores = {}
   runs = []
   count=0
@@ -209,6 +210,7 @@ if __name__ == '__main__':
   for key, val in mask.items():
     data = data[ data[key] == val ]
 
+
   # plt.figure(figsize=(15,8))
   g = sns.relplot(x='episode',
               y=y_var, 
@@ -226,14 +228,14 @@ if __name__ == '__main__':
   g.set_axis_labels( "Episode" , y_var)
 
   # Adjust the spacing between subplots and legend
-  plt.subplots_adjust(bottom=0.22)
+  plt.subplots_adjust(bottom=0.3)
 
   # sns.move_legend(g, "lower center", bbox_to_anchor=[0.5, -0.1],
-  sns.move_legend(g, "lower center", bbox_to_anchor=[0.4, -0.3],
-                ncol=len(CONDITIONS.keys())//2, title=None, frameon=False,)
+  sns.move_legend(g, "lower center",                 ncol=len(CONDITION_NAMES), title=None, frameon=False,)
   
 
-  plt.savefig(f'{args.path[0]}/combined_poster{y_var}.png', bbox_inches='tight')
+  plt.savefig(f'{args.path[0]}/main_paper{y_var}.png', bbox_inches='tight')
+  plt.savefig(f'{args.path[0]}/main_paper{y_var}.svg', bbox_inches='tight')
   plt.show()
   # Akhil's logic: 
   # ideal_len = 4991
